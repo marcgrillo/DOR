@@ -200,13 +200,14 @@ class DatasetGenerator:
                     
                     for j in range(1, num_steps + 1):
                         # Subset selection
+                        current_k = k_subset[0] if (isinstance(k_subset, (list, tuple)) and j == 1) else k_subset[-1] if isinstance(k_subset, (list, tuple)) else k_subset
                         rng_subset = np.random.default_rng(i * 1000 + j)
-                        subset_indices = rng_subset.choice(f1, k_subset, replace=False)
+                        subset_indices = rng_subset.choice(f1, current_k, replace=False)
                         
                         # Apply Thurstone Noise (Noisy Utilities)
                         # Variance of difference must be sigma^2, so variance of each item is sigma^2 / 2
                         noise_std = sigma / np.sqrt(2)
-                        noisy_utilities = U[subset_indices] * n_max + np.random.normal(0, noise_std, k_subset)
+                        noisy_utilities = U[subset_indices] * n_max + np.random.normal(0, noise_std, current_k)
                         
                         # Generate Subrank
                         sort_idx = np.argsort(-noisy_utilities)
@@ -214,7 +215,7 @@ class DatasetGenerator:
                         ranked_noisy_u = noisy_utilities[sort_idx]
                         
                         # Calculate Cards (eta) between consecutive elements
-                        cards = [int(np.clip(np.round(ranked_noisy_u[m] - ranked_noisy_u[m+1]), 0, n_max)) for m in range(k_subset - 1)]
+                        cards = [int(np.clip(np.round(ranked_noisy_u[m] - ranked_noisy_u[m+1]), 0, n_max)) for m in range(current_k - 1)]
                         
                         subranks.append({
                             "items": ranked_items,

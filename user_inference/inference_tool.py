@@ -14,7 +14,7 @@ def plot_marginal_utilities(transformer, w_map, bayes_samples, step_idx, output_
     """
     Plots marginal utility functions. 
     w_map: weights from FTRL.
-    bayes_samples: weights from BAYES (Nested Sampling).
+    bayes_samples: weights from BAYES (HMC).
     """
     f2 = transformer.num_criteria
     x_plot = np.linspace(0, 1, 100)
@@ -123,9 +123,9 @@ def run_inference_tool(data_path):
         w_map_full = sampler.find_map()
         w_map = w_map_full[:n_params]
         
-        # Run BAYES (Nested Sampling)
+        # Run BAYES (HMC)
         print("Running BAYES (Posterior sampling)...")
-        bayes_samples_full = sampler.run_nested(nlive=200)
+        bayes_samples_full = sampler.run_hmc(num_samples=200, num_warmup=200)
         bayes_samples = bayes_samples_full[:, :n_params]
         
         # Plot

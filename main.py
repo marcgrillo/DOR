@@ -53,7 +53,7 @@ if __name__ == "__main__":
 
         algo_type, model_type = alg_name.split('-')
         if algo_type == 'BAYES':
-            HM = int(max(1, HM_0/10))
+            HM = int(max(1, HM_0/4))
         else:
             HM = HM_0
         
@@ -79,7 +79,7 @@ if __name__ == "__main__":
 
             algo_type, model_type = alg_name.split('-')
             if algo_type == 'BAYES':
-                HM = int(max(1, HM_0/10))
+                HM = int(max(1, HM_0/4))
             else:
                 HM = HM_0
 
@@ -110,7 +110,7 @@ if __name__ == "__main__":
             
             algo_type, model_type = alg_name.split('-')
             if algo_type == 'BAYES':
-                HM = int(max(1, HM_0/10))
+                HM = int(max(1, HM_0/4))
             else:
                 HM = HM_0
 

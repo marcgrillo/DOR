@@ -24,7 +24,7 @@ class RankingSystem:
         self.sampler.add_preference(idx_up, idx_down)
 
     def run_inference(self):
-        self.omega_samples = self.sampler.run_nested()
+        self.omega_samples = self.sampler.run_hmc()
 
     def get_ranking_scores(self):
         if not hasattr(self, 'omega_samples'):

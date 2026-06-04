@@ -10,7 +10,7 @@ def get_sampler_state(sampler, alg):
     """
     algo_type, _ = alg.split('-')
     if algo_type == 'BAYES':
-        return sampler.run_nested(nlive=200) # smaller nlive for speed during baseline testing
+        return sampler.run_hmc(num_samples=200, num_warmup=200) # smaller num_samples for speed during baseline testing
     elif algo_type == 'FTRL':
         return sampler.find_map()
     else:

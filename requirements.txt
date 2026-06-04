@@ -3,3 +3,6 @@ scipy
 pandas
 matplotlib
 tqdm
+jax
+jaxlib
+numpyro
