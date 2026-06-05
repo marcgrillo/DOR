@@ -10,6 +10,8 @@ figs/
 tests/
 user_inference/*.png
 user_inference/*.npy
+*.csv
+grid_results_tiny.npz
 
 # OS and IDE
 .vscode/
