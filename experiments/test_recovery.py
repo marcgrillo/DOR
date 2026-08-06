@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from mcda.models import PiecewiseLinearTransformer
-from inference.engine import PreferenceSampler
+from inference.engine import PreferenceSampler, RHO
 from user_inference.inference_tool import plot_marginal_utilities
 
 def generate_synthetic_data(num_alternatives=20, num_criteria=2, num_intervals=3, n_max=5):
@@ -27,50 +27,46 @@ def generate_synthetic_data(num_alternatives=20, num_criteria=2, num_intervals=3
     # Criterion 2: [0.8, 0.4, 0.1] (Concave)
     w_true = np.array([0.1, 0.4, 0.8, 0.8, 0.4, 0.1])
     
-    # True Deltas
+    # True Deltas (engine convention: theta_k = sum_{m<=k} (rho + delta_raw_m))
     delta_true = np.ones(n_max) * 0.5
-    theta_true = np.cumsum(delta_true)
+    theta_true = np.cumsum(delta_true + RHO)
     
     # 4. Compute True Utilities
     U_true = X_transformed @ w_true
     
-    # 5. Generate Full Ranking Preferences
+    # 5. Generate Adjacent-Only Preferences (consecutive pairs of the true ranking)
     # Sort alternatives by true utility
     ranked_indices = np.argsort(-U_true)
-    
+
     preferences = []
-    # Generate all pairwise preferences for the full ranking
-    for i in range(len(ranked_indices)):
-        for j in range(i + 1, len(ranked_indices)):
-            up_idx = ranked_indices[i]
-            down_idx = ranked_indices[j]
-            
-            u_diff = U_true[up_idx] - U_true[down_idx]
-            
-            # Find the most likely 'eta' according to the model
-            # P(eta = k) = sigma(theta_k - u) - sigma(theta_{k-1} - u)
-            best_eta = 0
-            best_prob = -1
-            
-            from scipy.special import expit
-            for k in range(n_max + 1):
-                if k == 0:
-                    lb = 0.0
-                else:
-                    lb = theta_true[k-1]
-                
-                if k < n_max:
-                    ub = theta_true[k]
-                    prob = expit(ub - u_diff) - expit(lb - u_diff)
-                else:
-                    prob = 1.0 - expit(lb - u_diff)
-                
-                if prob > best_prob:
-                    best_prob = prob
-                    best_eta = k
-                    
-            preferences.append([up_idx, down_idx, best_eta])
-            
+    from scipy.special import expit
+    for i in range(len(ranked_indices) - 1):
+        up_idx = ranked_indices[i]
+        down_idx = ranked_indices[i + 1]
+
+        u_diff = U_true[up_idx] - U_true[down_idx]
+
+        # Most likely 'eta' under the conditional CLM with theta_0 = -inf:
+        #   P(eta=0)          = sigma(theta_1 - u)
+        #   P(eta=k), 0<k<max = sigma(theta_{k+1} - u) - sigma(theta_k - u)
+        #   P(eta=n_max)      = 1 - sigma(theta_{n_max} - u)
+        best_eta = 0
+        best_prob = -1
+
+        for k in range(n_max + 1):
+            if k == 0:
+                prob = expit(theta_true[0] - u_diff)
+            elif k < n_max:
+                prob = expit(theta_true[k] - u_diff) - expit(theta_true[k-1] - u_diff)
+            else:
+                prob = 1.0 - expit(theta_true[k-1] - u_diff)
+
+            if prob > best_prob:
+                best_prob = prob
+                best_eta = k
+
+        preferences.append([up_idx, down_idx, best_eta])
+
     return transformer, X_transformed, w_true, np.array(preferences), n_params
 
 def run_recovery_test():
@@ -78,7 +74,9 @@ def run_recovery_test():
     n_max = 5
     transformer, X_transformed, w_true, preferences, n_params = generate_synthetic_data(n_max=n_max)
     
-    print(f"Generated {len(preferences)} pairwise preferences.")
+    print(f"Generated {len(preferences)} adjacent pairwise preferences.")
+    eta_counts = np.bincount(preferences[:, 2], minlength=n_max + 1)
+    print(f"Eta distribution (0..{n_max}): {eta_counts.tolist()}")
     
     # Initialize Sampler
     sampler = PreferenceSampler(X_transformed, preferences, n_params, n_max)
@@ -88,7 +86,7 @@ def run_recovery_test():
     w_map = w_map_full[:n_params]
     
     print("Running BAYES (HMC Posterior sampling)...")
-    bayes_samples_full = sampler.run_hmc(num_samples=300, num_warmup=200)
+    bayes_samples_full = sampler.run_hmc(num_samples=300, num_warmup=200, seed=2026)
     bayes_samples = bayes_samples_full[:, :n_params]
     
     # Normalize to compare shapes directly

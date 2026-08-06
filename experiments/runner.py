@@ -2,7 +2,7 @@ import os
 from common import utils
 from experiments.simulation import process_single_table
 
-def run_batch_experiments(F1, F2, sub_fold, dataset_folds, alg, overwrite, hm=None, k_subset=3, num_steps=7, eta_max=30):
+def run_batch_experiments(F1, F2, sub_fold, dataset_folds, alg, overwrite, hm=None, k_subset=3, num_steps=7, eta_max=30, expansion='all', seed_base=0, log_loss=True):
     """
     Orchestrates the baseline experiments across multiple datasets and configurations.
     """
@@ -44,7 +44,10 @@ def run_batch_experiments(F1, F2, sub_fold, dataset_folds, alg, overwrite, hm=No
                         k_subset=k_subset,
                         eta_max=eta_max,
                         output_dir=table_dir,
-                        alg=alg, 
+                        alg=alg,
                         overwrite=overwrite,
-                        table_index=i
+                        table_index=i,
+                        expansion=expansion,
+                        seed_base=seed_base,
+                        log_loss=log_loss
                     )

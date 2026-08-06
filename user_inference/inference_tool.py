@@ -110,13 +110,10 @@ def run_inference_tool(data_path):
         items = step['items']
         cards = step['cards']
         
-        # Expand subrank into pairwise
-        for start_idx in range(len(items)):
-            for end_idx in range(start_idx + 1, len(items)):
-                p_win = items[start_idx]
-                p_lose = items[end_idx]
-                eta = sum(cards[start_idx : end_idx])
-                sampler.add_preference(int(p_win), int(p_lose), int(eta))
+        # Expand subrank into pairwise (adjacent-only primary likelihood, adjacent-v1)
+        from experiments.simulation import expand_subrank
+        for p_win, p_lose, eta in expand_subrank(items, cards, expansion='adjacent'):
+            sampler.add_preference(p_win, p_lose, eta)
         
         # Run FTRL (MAP)
         print("Running FTRL (MAP estimation)...")

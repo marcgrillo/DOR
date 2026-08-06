@@ -1,0 +1,72 @@
+% FTRL-DOR rankings for the LEA case study (adjacent-only likelihood,
+% e_max = n_max = 30).  Display scaling (plan E5):
+% U_disp(a) = U(a) / U_max * 100, U_max = sum of all piece weights
+% (utility of the ideal alternative scoring 100 on every criterion).
+
+\begin{table}[h!]
+\centering
+\caption{Ranking of the alternatives considering the parameters estimated through FTRL-DOR ($T=1$). The reference alternatives are written in bold.}
+\label{tab:RANK_Ex1}
+\begin{tabular}{c|lc}
+\toprule
+Rank&Region & $U\left(a\right)$ \\
+\midrule
+1 & Veneto & 96.0885 \\
+2 & Tuscany & 95.3130 \\
+3 & Emilia Romagna & 92.7972 \\
+4 & Autonomous Province of Trento & 92.7411 \\
+5 & Piedmont & 90.1328 \\
+6 & \textbf{Lombardy} & \textbf{85.9181} \\
+7 & Umbria & 85.8965 \\
+8 & \textbf{Marche} & \textbf{82.2887} \\
+9 & Friuli Venezia Giulia & 78.4959 \\
+10 & Apulia & 75.7945 \\
+11 & Liguria & 72.3597 \\
+12 & Lazio & 71.5349 \\
+13 & \textbf{Campania} & \textbf{68.4273} \\
+14 & Autonomous Province of Bolzano & 67.1654 \\
+15 & Molise & 64.1979 \\
+16 & Sardinia & 64.0944 \\
+17 & \textbf{Basilicata} & \textbf{63.0374} \\
+18 & Abruzzo & 60.1098 \\
+19 & Calabria & 59.0807 \\
+20 & Sicily & 57.0547 \\
+21 & Aosta Valley & 55.6393 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[h!]
+\centering
+\caption{Ranking of the alternatives considering the parameters estimated through FTRL-DOR after each of the $T=3$ sessions. The reference alternatives are written in bold}
+\label{tab:RANK_Ex2}
+\begin{tabularx}{\textwidth}{c|Cc|Cc|Cc}
+\toprule
+\multirow{2}{*}{Rank}&\multicolumn{2}{c}{Step 1}&\multicolumn{2}{c}{Step 2}&\multicolumn{2}{c}{Step 3}\\
+\cmidrule(lr){2-3}\cmidrule(lr){4-5}\cmidrule(lr){6-7}
+&Region&$U\left(a\right)$&Region&$U\left(a\right)$&Region&$U\left(a\right)$\\
+\midrule
+1 & Veneto & 94.48 & Veneto & 93.59 & Veneto & 93.98 \\
+2 & Tuscany & 92.57 & Tuscany & 91.05 & \textbf{Tuscany} & \textbf{91.90} \\
+3 & A. P. of Trento & 91.92 & A. P. of Trento & 88.30 & A. P. of Trento & 90.81 \\
+4 & Emilia Romagna & 90.67 & \textbf{Emilia Romagna} & \textbf{88.28} & \textbf{Emilia Romagna} & \textbf{89.68} \\
+5 & Piedmont & 85.42 & Piedmont & 82.89 & Piedmont & 84.12 \\
+6 & \textbf{Lombardy} & \textbf{82.46} & \textbf{Lombardy} & \textbf{77.34} & \textbf{Lombardy} & \textbf{80.49} \\
+7 & Umbria & 81.11 & Umbria & 76.61 & Umbria & 79.18 \\
+8 & \textbf{Marche} & \textbf{69.28} & \textbf{Marche} & \textbf{62.91} & \textbf{Marche} & \textbf{66.60} \\
+9 & Friuli Venezia Giulia & 66.54 & \textbf{Friuli Venezia Giulia} & \textbf{61.09} & \textbf{Friuli Venezia Giulia} & \textbf{63.66} \\
+10 & Apulia & 62.44 & Apulia & 53.38 & Apulia & 58.84 \\
+11 & Liguria & 56.04 & Liguria & 49.72 & Liguria & 52.07 \\
+12 & Lazio & 55.20 & Lazio & 45.12 & \textbf{Lazio} & \textbf{50.93} \\
+13 & \textbf{Campania} & \textbf{50.42} & A. P. of Bolzano & 42.85 & \textbf{Campania} & \textbf{45.94} \\
+14 & A. P. of Bolzano & 49.12 & \textbf{Campania} & \textbf{41.51} & A. P. of Bolzano & 45.29 \\
+15 & Molise & 46.43 & Molise & 38.33 & Molise & 42.11 \\
+16 & Sardinia & 45.78 & Sardinia & 36.49 & Sardinia & 41.70 \\
+17 & \textbf{Basilicata} & \textbf{44.86} & \textbf{Basilicata} & \textbf{34.37} & \textbf{Basilicata} & \textbf{37.42} \\
+18 & Abruzzo & 44.81 & Aosta Valley & 33.79 & \textbf{Abruzzo} & \textbf{35.62} \\
+19 & Aosta Valley & 42.78 & \textbf{Abruzzo} & \textbf{33.69} & Aosta Valley & 33.75 \\
+20 & Sicily & 42.02 & Sicily & 31.04 & \textbf{Sicily} & \textbf{32.29} \\
+21 & Calabria & 40.94 & Calabria & 29.91 & Calabria & 31.10 \\
+\bottomrule
+\end{tabularx}
+\end{table}
