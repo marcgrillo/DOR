@@ -306,15 +306,24 @@ def plot_utilities(transformer, w_map, samples, out_path):
     plt.close()
 
 
-def plot_corner(samples, n_params, out_path):
+def plot_corner(samples, n_params, out_path, group_sizes=None):
     """
-    Corner plot of the T=1 posterior weights, NORMALIZED per draw to shares
+    Corner plot of the posterior weights, NORMALIZED per draw to shares
     hat{w}_i = w_i / sum_j w_j (the convention of the paper's Figure 5: axes in
     [0,1], bivariate support inside the simplex triangle).  The overall scale
     of w is shared with the thresholds and is not what the figure is meant to
     show; the shares are the ranking-relevant quantity.
+
+    group_sizes: piece counts per criterion (transformer.n_w).  When given,
+    piece weights are summed within each criterion first, so the plot shows
+    the CRITERION importance shares hat{w}_j = U_j(100)/sum_l U_l(100) --
+    the gamma_j > 1 counterpart of the T=1 plot (used for the T=3 case).
     """
     w = samples[:, :n_params]
+    if group_sizes is not None:
+        idx = np.cumsum([0] + list(group_sizes))
+        w = np.stack([w[:, idx[j]:idx[j + 1]].sum(axis=1)
+                      for j in range(len(group_sizes))], axis=1)
     w = w / w.sum(axis=1, keepdims=True)
     labels = [r"$\hat{w}_1$", r"$\hat{w}_2$", r"$\hat{w}_3$"]
     if HAVE_CORNER:
@@ -585,6 +594,8 @@ def main():
                    os.path.join(OUT_DIR, "utilities_t1_plot.png"))
     plot_corner(res1[0]["samples"], tr1.total_params,
                 os.path.join(OUT_DIR, "croner.png"))
+    plot_corner(res3[-1]["samples"], tr3.total_params,
+                os.path.join(OUT_DIR, "croner_t3.png"), group_sizes=tr3.n_w)
     for res in res3:
         plot_utilities(tr3, res["w_map"], res["samples"],
                        os.path.join(OUT_DIR, f"t_3_{res['step']}.png"))
