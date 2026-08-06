@@ -19,12 +19,24 @@ already in the npz are skipped.
 import time
 import os
 import itertools
+
+# Keep each worker (and the parent) single-threaded at the BLAS/XLA level:
+# the per-fit matrices are tiny, so parallelism comes from running CONFIGS in
+# separate processes, not from intra-op threads.  Must be set before jax loads.
+os.environ.setdefault("XLA_FLAGS", "--xla_cpu_multi_thread_eigen=false intra_op_parallelism_threads=1")
+os.environ.setdefault("OMP_NUM_THREADS", "1")
+os.environ.setdefault("MKL_NUM_THREADS", "1")
+
 import numpy as np
 
 from experiments.runner import run_batch_experiments
 from experiments.metrics import BenchmarkRunner
 from common.utils import parse_subfold_string
 import common.utils as utils
+
+# Configs are independent (separate dataset folds, sample dirs and metric
+# caches); only the parent process touches the npz.
+NUM_WORKERS = 12
 
 TEST_MODE = False
 
@@ -166,24 +178,50 @@ def main():
     print(f"Configurations remaining: {total_to_run}")
 
     completed = 0
-    for idx, config in enumerate(configs_to_run):
-        f1, f2, steps, a_r, k, f_inc = config
-        config_str = f"F1={f1}_F2={f2}_S={steps}_AR={a_r}_K={k}_Inc={f_inc}"
+    if NUM_WORKERS <= 1:
+        for idx, config in enumerate(configs_to_run):
+            f1, f2, steps, a_r, k, f_inc = config
+            config_str = f"F1={f1}_F2={f2}_S={steps}_AR={a_r}_K={k}_Inc={f_inc}"
 
-        config_start = time.time()
-        print(f"\n========================================================")
-        print(f"[{idx+1}/{total_to_run}] Running Configuration: {config_str}")
-        print(f"========================================================")
+            config_start = time.time()
+            print(f"\n========================================================")
+            print(f"[{idx+1}/{total_to_run}] Running Configuration: {config_str}")
+            print(f"========================================================")
 
-        try:
-            config_str, config_results = run_single_config(config, HM_0)
-            all_results.setdefault(config_str, {}).update(config_results)
-            np.savez_compressed(SAVE_PATH, results=all_results,
-                                run_tag=RUN_TAG, run_seed=RUN_SEED, eta_max=ETA_MAX)
-            completed += 1
-            print(f"[{completed}/{total_to_run}] Completed in {time.time() - config_start:.2f}s")
-        except Exception as e:
-            print(f"Error running configuration {config_str}: {e}")
+            try:
+                config_str, config_results = run_single_config(config, HM_0)
+                all_results.setdefault(config_str, {}).update(config_results)
+                np.savez_compressed(SAVE_PATH, results=all_results,
+                                    run_tag=RUN_TAG, run_seed=RUN_SEED, eta_max=ETA_MAX)
+                completed += 1
+                print(f"[{completed}/{total_to_run}] Completed in {time.time() - config_start:.2f}s")
+            except Exception as e:
+                print(f"Error running configuration {config_str}: {e}")
+    else:
+        # Parallel over configs; only the parent merges/saves the npz.
+        from concurrent.futures import ProcessPoolExecutor, as_completed
+        print(f"Running with {NUM_WORKERS} worker processes")
+        with ProcessPoolExecutor(max_workers=NUM_WORKERS) as ex:
+            futures = {}
+            for config in configs_to_run:
+                f1, f2, steps, a_r, k, f_inc = config
+                cs = f"F1={f1}_F2={f2}_S={steps}_AR={a_r}_K={k}_Inc={f_inc}"
+                futures[ex.submit(run_single_config, config, HM_0)] = cs
+            for fut in as_completed(futures):
+                cs = futures[fut]
+                try:
+                    config_str, config_results = fut.result()
+                    all_results.setdefault(config_str, {}).update(config_results)
+                    np.savez_compressed(SAVE_PATH, results=all_results,
+                                        run_tag=RUN_TAG, run_seed=RUN_SEED, eta_max=ETA_MAX)
+                    completed += 1
+                    elapsed = (time.time() - start_time) / 3600
+                    rate = completed / elapsed if elapsed > 0 else 0
+                    eta_h = (total_to_run - completed) / rate if rate > 0 else float('nan')
+                    print(f"[{completed}/{total_to_run}] Completed {cs} "
+                          f"({elapsed:.2f} h elapsed, ~{eta_h:.2f} h remaining)")
+                except Exception as e:
+                    print(f"Error running configuration {cs}: {e}")
 
     print(f"\nFinished! Total time: {(time.time() - start_time)/3600:.2f} h")
 
