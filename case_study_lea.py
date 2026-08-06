@@ -149,9 +149,27 @@ C_FTRL = "#d62728"
 # Inference
 # ----------------------------------------------------------------------------
 def build_transformer(gamma):
-    """Explicit breakpoints on the common [0,100] scale (see module docstring)."""
-    ch_p = [np.linspace(0.0, 100.0, gamma + 1) for _ in range(LEA_TABLE.shape[1])]
-    return PiecewiseLinearTransformer(ch_p)
+    """
+    Paper framework: the evaluation table is augmented with two ANCHOR
+    alternatives -- an ideal one scoring 100 on every criterion and an
+    anti-ideal one scoring 0 -- so that the equal-interval breakpoints span
+    the full [0,100] measurement scale regardless of the observed data range.
+    The anchors are used ONLY here (normalization); they never enter the
+    elicitation data, the rankings, or the RAI/PWI tables.
+
+    Since from_equal_intervals takes linspace(min, max, gamma+1) per column,
+    the augmented table yields breakpoints linspace(0, 100, gamma+1) -- i.e.
+    exactly the explicit [0,100] breakpoints this script used before; the two
+    constructions are mathematically identical (asserted below).
+    """
+    anchors = np.array([[100.0] * LEA_TABLE.shape[1],
+                        [0.0] * LEA_TABLE.shape[1]])
+    augmented = np.vstack([LEA_TABLE, anchors])
+    transformer = PiecewiseLinearTransformer.from_equal_intervals(augmented, gamma)
+    explicit = [np.linspace(0.0, 100.0, gamma + 1) for _ in range(LEA_TABLE.shape[1])]
+    for got, exp in zip(transformer.ch_p, explicit):
+        assert np.allclose(got, exp), (got, exp)
+    return transformer
 
 
 def run_case(case_name, sessions, gamma):
