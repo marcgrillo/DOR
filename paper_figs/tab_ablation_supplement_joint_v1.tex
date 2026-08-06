@@ -1,0 +1,19 @@
+\begin{table}[htp]
+    \centering
+    \caption{Ablation: the adjacent-gap likelihood (primary model) against the all-pairs composite construction (subscript ap) on identical data. The composite re-uses each elicited card count up to $k-1$ times, which buys a small amount of point accuracy at the cost of an over-concentrated posterior.}
+    \label{tab:ablation_composite}
+\begin{tabularx}{\textwidth}{l|CCCCCCCCCCCC}
+\toprule
+\multirow{2}{*}{Inc.}&\multicolumn{4}{c}{ASR}&\multicolumn{4}{c}{ASP}&\multicolumn{4}{c}{AIOS}\\
+\cmidrule(lr){2-5}\cmidrule(lr){6-9}\cmidrule(lr){10-13}
+&FTRL&FTRL$_{\text{ap}}$&BAYES&BAYES$_{\text{ap}}$&FTRL&FTRL$_{\text{ap}}$&BAYES&BAYES$_{\text{ap}}$&FTRL&FTRL$_{\text{ap}}$&BAYES&BAYES$_{\text{ap}}$\\
+\midrule
+all & $0.212{\scriptstyle\pm0.003}$ & $0.228{\scriptstyle\pm0.003}$ & $0.175{\scriptstyle\pm0.004}$ & $0.201{\scriptstyle\pm0.005}$ & $0.846{\scriptstyle\pm0.001}$ & $0.856{\scriptstyle\pm0.001}$ & $0.805{\scriptstyle\pm0.002}$ & $0.828{\scriptstyle\pm0.002}$ & $0.502{\scriptstyle\pm0.008}$ & $0.527{\scriptstyle\pm0.008}$ & $0.439{\scriptstyle\pm0.011}$ & $0.481{\scriptstyle\pm0.011}$ \\
+\midrule
+0\% & $0.252{\scriptstyle\pm0.007}$ & $0.270{\scriptstyle\pm0.007}$ & $0.203{\scriptstyle\pm0.011}$ & $0.230{\scriptstyle\pm0.011}$ & $0.869{\scriptstyle\pm0.002}$ & $0.878{\scriptstyle\pm0.002}$ & $0.827{\scriptstyle\pm0.005}$ & $0.848{\scriptstyle\pm0.005}$ & $0.551{\scriptstyle\pm0.016}$ & $0.571{\scriptstyle\pm0.016}$ & $0.468{\scriptstyle\pm0.022}$ & $0.505{\scriptstyle\pm0.023}$ \\
+15\% & $0.230{\scriptstyle\pm0.006}$ & $0.247{\scriptstyle\pm0.007}$ & $0.183{\scriptstyle\pm0.009}$ & $0.213{\scriptstyle\pm0.010}$ & $0.859{\scriptstyle\pm0.002}$ & $0.868{\scriptstyle\pm0.002}$ & $0.814{\scriptstyle\pm0.005}$ & $0.837{\scriptstyle\pm0.005}$ & $0.520{\scriptstyle\pm0.016}$ & $0.553{\scriptstyle\pm0.016}$ & $0.443{\scriptstyle\pm0.021}$ & $0.492{\scriptstyle\pm0.023}$ \\
+35\% & $0.192{\scriptstyle\pm0.005}$ & $0.208{\scriptstyle\pm0.006}$ & $0.164{\scriptstyle\pm0.008}$ & $0.190{\scriptstyle\pm0.009}$ & $0.837{\scriptstyle\pm0.002}$ & $0.847{\scriptstyle\pm0.002}$ & $0.797{\scriptstyle\pm0.005}$ & $0.821{\scriptstyle\pm0.005}$ & $0.495{\scriptstyle\pm0.016}$ & $0.512{\scriptstyle\pm0.016}$ & $0.450{\scriptstyle\pm0.021}$ & $0.489{\scriptstyle\pm0.023}$ \\
+50\% & $0.174{\scriptstyle\pm0.005}$ & $0.188{\scriptstyle\pm0.005}$ & $0.149{\scriptstyle\pm0.007}$ & $0.171{\scriptstyle\pm0.008}$ & $0.820{\scriptstyle\pm0.002}$ & $0.830{\scriptstyle\pm0.002}$ & $0.782{\scriptstyle\pm0.004}$ & $0.805{\scriptstyle\pm0.005}$ & $0.443{\scriptstyle\pm0.016}$ & $0.471{\scriptstyle\pm0.016}$ & $0.397{\scriptstyle\pm0.021}$ & $0.438{\scriptstyle\pm0.023}$ \\
+\bottomrule
+\end{tabularx}
+\end{table}

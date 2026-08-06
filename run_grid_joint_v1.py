@@ -65,11 +65,20 @@ RUN_SEED = 20260806  # global offset; per-(config, arm, table, step) seeds deriv
 SAVE_PATH = "grid_results_joint_v1_tiny.npz" if TEST_MODE else "grid_results_joint_v1.npz"
 
 # (sub_fold, expansion, uses_all_tables)
+# Arms 0-3: main campaign (primary adjacent + all-pairs ablation).
+# Arms 4-7 (appended 2026-08-07 -- keep order stable, seed_base uses the index):
+#   SMAA  = SMAA-DOR baseline (corrente2025deck), Hit-and-Run samples
+#   DORLP = original DOR LP point estimate (barbati2024deck), fbnote 884-i
+#   *DIR  = direction-only ablation (card counts ignored), fbnote 884-ii
 ARMS = [
     ('FTRL_DOR_ADJJ1', 'adjacent', True),
     ('BAYES_DOR_ADJJ1', 'adjacent', False),
     ('FTRL_DOR_ALLJ1', 'all', True),
     ('BAYES_DOR_ALLJ1', 'all', False),
+    ('SMAA_DOR_ADJJ1', 'adjacent', False),
+    ('DORLP_DOR_ADJJ1', 'adjacent', True),
+    ('FTRLDIR_DOR_ADJJ1', 'adjacent', True),
+    ('BAYESDIR_DOR_ADJJ1', 'adjacent', False),
 ]
 
 
@@ -93,7 +102,7 @@ def collect_sidecar(dataset_fold, sub_fold, f1, f2, steps, hm, name):
     return out
 
 
-def run_single_config(config, hm_0):
+def run_single_config(config, hm_0, arms_to_run=None):
     f1, f2, steps, a_r, k, f_inc = config
     k_tuple = (a_r, k)
     config_str = f"F1={f1}_F2={f2}_S={steps}_AR={a_r}_K={k}_Inc={f_inc}"
@@ -107,6 +116,8 @@ def run_single_config(config, hm_0):
 
     config_results = {}
     for arm_idx, (sub_fold, expansion, all_tables) in enumerate(ARMS):
+        if arms_to_run is not None and sub_fold not in arms_to_run:
+            continue
         alg_name, _ = parse_subfold_string(sub_fold)
         hm = hm_0 if all_tables else int(max(1, hm_0 / 4))
         seed_base = config_seed_base(f1, f2, a_r, k, f_inc, arm_idx)
@@ -163,13 +174,14 @@ def main():
             print(f"Error loading {SAVE_PATH}: {e}. Starting fresh.")
 
     arm_names = [a[0] for a in ARMS]
-    configs_to_run = []
+    configs_to_run = []   # (config, missing_arm_names)
     for config in combinations:
         f1, f2, steps, a_r, k, f_inc = config
         config_str = f"F1={f1}_F2={f2}_S={steps}_AR={a_r}_K={k}_Inc={f_inc}"
-        if config_str in all_results and all(sf in all_results[config_str] for sf in arm_names):
+        missing = [sf for sf in arm_names if sf not in all_results.get(config_str, {})]
+        if not missing:
             continue
-        configs_to_run.append(config)
+        configs_to_run.append((config, missing))
 
     total_to_run = len(configs_to_run)
     if total_to_run == 0:
@@ -179,17 +191,17 @@ def main():
 
     completed = 0
     if NUM_WORKERS <= 1:
-        for idx, config in enumerate(configs_to_run):
+        for idx, (config, missing) in enumerate(configs_to_run):
             f1, f2, steps, a_r, k, f_inc = config
             config_str = f"F1={f1}_F2={f2}_S={steps}_AR={a_r}_K={k}_Inc={f_inc}"
 
             config_start = time.time()
             print(f"\n========================================================")
-            print(f"[{idx+1}/{total_to_run}] Running Configuration: {config_str}")
+            print(f"[{idx+1}/{total_to_run}] Running Configuration: {config_str} arms={missing}")
             print(f"========================================================")
 
             try:
-                config_str, config_results = run_single_config(config, HM_0)
+                config_str, config_results = run_single_config(config, HM_0, missing)
                 all_results.setdefault(config_str, {}).update(config_results)
                 np.savez_compressed(SAVE_PATH, results=all_results,
                                     run_tag=RUN_TAG, run_seed=RUN_SEED, eta_max=ETA_MAX)
@@ -203,10 +215,10 @@ def main():
         print(f"Running with {NUM_WORKERS} worker processes")
         with ProcessPoolExecutor(max_workers=NUM_WORKERS) as ex:
             futures = {}
-            for config in configs_to_run:
+            for config, missing in configs_to_run:
                 f1, f2, steps, a_r, k, f_inc = config
                 cs = f"F1={f1}_F2={f2}_S={steps}_AR={a_r}_K={k}_Inc={f_inc}"
-                futures[ex.submit(run_single_config, config, HM_0)] = cs
+                futures[ex.submit(run_single_config, config, HM_0, missing)] = cs
             for fut in as_completed(futures):
                 cs = futures[fut]
                 try:

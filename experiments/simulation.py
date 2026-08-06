@@ -6,19 +6,27 @@ from inference.engine import PreferenceSampler
 
 def get_sampler_state(sampler, alg, seed=0, return_diagnostics=False):
     """
-    Returns the state of the sampler (Samples for BAYES/SMAA, MAP for FTRL).
-    For BAYES with return_diagnostics=True, returns (samples, {'divergences', 'max_rhat'}).
+    Returns the state of the sampler:
+      BAYES / BAYESDIR -> HMC posterior samples (the DIR variants use the
+                          direction-only likelihood set on the sampler);
+      FTRL / FTRLDIR   -> constrained MAP point estimate;
+      SMAA             -> Hit-and-Run samples over the SMAA-DOR polytope;
+      DORLP            -> original DOR LP point estimate (barbati2024deck).
+    For BAYES* with return_diagnostics=True, returns (samples, diagnostics).
     """
     algo_type, _ = alg.split('-')
-    if algo_type == 'BAYES':
+    if algo_type in ('BAYES', 'BAYESDIR'):
         return sampler.run_hmc(num_samples=200, num_warmup=200, seed=seed,
                                return_diagnostics=return_diagnostics)
-    elif algo_type == 'FTRL':
+    elif algo_type in ('FTRL', 'FTRLDIR'):
         return sampler.find_map()
     elif algo_type == 'SMAA':
         from inference.smaa import sample_smaa_dor
         return sample_smaa_dor(sampler.X_diff, sampler.etas, sampler.n_params,
                                num_samples=200, seed=seed)
+    elif algo_type == 'DORLP':
+        from inference.smaa import solve_dor_lp
+        return solve_dor_lp(sampler.X_diff, sampler.etas, sampler.n_params)
     else:
         raise ValueError(f"Unknown algorithm type: {algo_type}")
 
@@ -96,8 +104,11 @@ def process_single_table(
     n_params = transformer.total_params
     n_max = eta_max # Use the hyperparameter
 
-    sampler = PreferenceSampler(feature_matrix, [], n_params, n_max)
     algo_type = alg.split('-')[0]
+    sampler = PreferenceSampler(
+        feature_matrix, [], n_params, n_max,
+        likelihood='direction' if algo_type in ('BAYESDIR', 'FTRLDIR') else 'joint'
+    )
     prev_state = None
 
     # 2. Main Loop
@@ -120,12 +131,12 @@ def process_single_table(
 
         # Prequential predictive log-loss of the incoming batch, computed BEFORE updating (C14).
         loss_path = os.path.join(output_dir, f"loss_{j}.npy")
-        if log_loss and algo_type in ('BAYES', 'FTRL') and (overwrite or not os.path.exists(loss_path)):
+        if log_loss and algo_type in ('BAYES', 'FTRL', 'BAYESDIR', 'FTRLDIR') and (overwrite or not os.path.exists(loss_path)):
             state_for_loss = prev_state
             if state_for_loss is None:
                 if j == 1:
                     state_for_loss = (sampler.sample_prior(200, seed=step_seed)
-                                      if algo_type == 'BAYES' else sampler.find_map())
+                                      if algo_type.startswith('BAYES') else sampler.find_map())
                 else:
                     prev_path = os.path.join(output_dir, f"{j-1}.npy")
                     if os.path.exists(prev_path):
@@ -149,7 +160,7 @@ def process_single_table(
             sampler.add_gap(upper, lower, eta)
 
         # Run inference
-        if algo_type == 'BAYES':
+        if algo_type in ('BAYES', 'BAYESDIR'):
             w_state, diag = get_sampler_state(sampler, alg, seed=step_seed, return_diagnostics=True)
             np.save(os.path.join(output_dir, f"diag_{j}.npy"),
                     np.array([diag['divergences'], diag['max_rhat']]))

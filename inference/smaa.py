@@ -267,3 +267,34 @@ def sample_smaa_dor(X_diff, etas, n_params, num_samples=200, seed=0):
     """Convenience wrapper used by the experiment pipeline."""
     sampler = SMAADORSampler(X_diff, etas, n_params, seed=seed)
     return sampler.sample(num_samples=num_samples)
+
+
+def solve_dor_lp(X_diff, etas, n_params):
+    """
+    Original DOR linear programme (barbati2024deck) as a POINT-ESTIMATE
+    baseline: phase 1 minimises the total deviation sigma_bar; phase 2
+    maximises the discrimination k subject to that deviation budget and
+    returns the weight part of the optimal vertex (the "most discriminant"
+    compatible value function; sum(w) = 1 by the normalisation constraint).
+
+    Falls back from hard ordering constraints to soft (dropped) ordering when
+    infeasible, mirroring SMAADORSampler; returns uniform weights when there
+    are no observations or the LPs fail.
+    """
+    p = int(n_params)
+    uniform = np.full(p, 1.0 / p)
+    D = np.atleast_2d(np.asarray(X_diff, dtype=float))
+    if D.size == 0 or len(np.asarray(etas).ravel()) == 0:
+        return uniform
+    solver = SMAADORSampler(X_diff, etas, n_params)
+    for hard in (True, False):
+        res1 = solver._phase1(hard)
+        if not res1.success:
+            continue
+        sigma_bar = float(res1.fun)
+        res2 = solver._phase2(hard, sigma_bar + 1e-9)
+        if res2.success:
+            w = np.clip(res2.x[:p], 0.0, None)
+            s = w.sum()
+            return w / s if s > 0 else uniform
+    return uniform

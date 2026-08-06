@@ -62,6 +62,26 @@ def _jax_log_likelihood_untraced(omega, X_diff, etas, n_params, n_max, rho):
 _jax_log_prob_per_obs = jax.jit(_jax_log_prob_per_obs_untraced, static_argnums=(3, 4))
 _jax_log_likelihood = jax.jit(_jax_log_likelihood_untraced, static_argnums=(3, 4))
 
+def _jax_dir_log_prob_per_obs_untraced(omega, X_diff, n_params):
+    """
+    DIRECTION-ONLY ablation likelihood (fbnote 884-ii; grillo2025ordinal-style):
+    each gap contributes P(observed direction) = sigmoid(x^T w); the card
+    counts are ignored entirely.  Thresholds are untouched by the data (they
+    remain prior draws) so parameter shapes match the joint model.
+    """
+    w = omega[:n_params]
+    u = jnp.dot(X_diff, w)
+    return -jnp.logaddexp(0.0, -u)
+
+_jax_dir_log_prob_per_obs = jax.jit(_jax_dir_log_prob_per_obs_untraced, static_argnums=(2,))
+
+def _jax_dir_neg_log_posterior_untraced(omega, X_diff, n_params, prior_a, prior_b):
+    ll = jnp.sum(_jax_dir_log_prob_per_obs_untraced(omega, X_diff, n_params))
+    log_prior = jnp.sum((prior_a - 1.0) * jnp.log(omega + 1e-12) - omega / prior_b)
+    return -(ll + log_prior)
+
+_jax_dir_neg_log_posterior = jax.jit(_jax_dir_neg_log_posterior_untraced, static_argnums=(2,))
+
 def _jax_neg_log_posterior_untraced(omega, X_diff, etas, n_params, n_max, rho, prior_a, prior_b):
     ll = _jax_log_likelihood_untraced(omega, X_diff, etas, n_params, n_max, rho)
     log_prior = jnp.sum((prior_a - 1.0) * jnp.log(omega + 1e-12) - omega / prior_b)
@@ -74,11 +94,16 @@ class PreferenceSampler:
     """
     Bayesian (HMC) and FTRL Inference Engine for Difference of Responses (DOR) model.
     """
-    def __init__(self, feature_matrix, preferences, n_params, n_max, rho=RHO):
+    def __init__(self, feature_matrix, preferences, n_params, n_max, rho=RHO,
+                 likelihood='joint'):
         self.X = feature_matrix
         self.n_params = n_params
         self.n_max = n_max
         self.rho = rho
+        # 'joint' = direction+intensity CLM (primary model);
+        # 'direction' = direction-only ablation (card counts ignored).
+        assert likelihood in ('joint', 'direction')
+        self.likelihood = likelihood
 
         # Gamma Prior Params
         self.gamma_a = 1.0
@@ -160,14 +185,15 @@ class PreferenceSampler:
         if X.shape[0] == 0:
             return 0.0
         state = np.asarray(state)
+        if self.likelihood == 'direction':
+            per_obs = lambda om: _jax_dir_log_prob_per_obs(om, X, self.n_params)
+        else:
+            per_obs = lambda om: _jax_log_prob_per_obs(om, X, e, self.n_params, self.n_max, self.rho)
         if state.ndim == 1:
-            lp = _jax_log_prob_per_obs(jnp.asarray(state), X, e, self.n_params, self.n_max, self.rho)
-            return float(-jnp.sum(lp))
+            return float(-jnp.sum(per_obs(jnp.asarray(state))))
         if state.shape[0] == 0:
             return float('nan')
-        lps = jax.vmap(
-            lambda om: _jax_log_prob_per_obs(om, X, e, self.n_params, self.n_max, self.rho)
-        )(jnp.asarray(state))
+        lps = jax.vmap(per_obs)(jnp.asarray(state))
         pred = jax.scipy.special.logsumexp(lps, axis=0) - jnp.log(state.shape[0])
         return float(-jnp.sum(pred))
 
@@ -183,7 +209,10 @@ class PreferenceSampler:
                 'omega',
                 dist.Gamma(self.gamma_a, 1.0 / self.gamma_b).expand([self.n_params + self.n_max])
             )
-            ll = _jax_log_likelihood(omega, self.jax_X_diff, self.jax_etas, self.n_params, self.n_max, self.rho)
+            if self.likelihood == 'direction':
+                ll = jnp.sum(_jax_dir_log_prob_per_obs(omega, self.jax_X_diff, self.n_params))
+            else:
+                ll = _jax_log_likelihood(omega, self.jax_X_diff, self.jax_etas, self.n_params, self.n_max, self.rho)
             numpyro.factor('obs', ll)
 
         nuts_kernel = NUTS(model)
@@ -207,16 +236,21 @@ class PreferenceSampler:
 
         # We need a function that returns value and gradient as numpy arrays for scipy.optimize
         def obj_and_grad(omega):
-            val, grad = jax.value_and_grad(_jax_neg_log_posterior)(
-                jnp.array(omega),
-                self.jax_X_diff,
-                self.jax_etas,
-                self.n_params,
-                self.n_max,
-                self.rho,
-                alpha,
-                beta
-            )
+            if self.likelihood == 'direction':
+                val, grad = jax.value_and_grad(_jax_dir_neg_log_posterior)(
+                    jnp.array(omega), self.jax_X_diff, self.n_params, alpha, beta
+                )
+            else:
+                val, grad = jax.value_and_grad(_jax_neg_log_posterior)(
+                    jnp.array(omega),
+                    self.jax_X_diff,
+                    self.jax_etas,
+                    self.n_params,
+                    self.n_max,
+                    self.rho,
+                    alpha,
+                    beta
+                )
             # return as float and float64 numpy array for scipy minimize
             return float(val), np.array(grad, dtype=np.float64)
 
