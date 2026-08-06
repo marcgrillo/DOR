@@ -307,12 +307,20 @@ def plot_utilities(transformer, w_map, samples, out_path):
 
 
 def plot_corner(samples, n_params, out_path):
-    """Corner plot of the T=1 posterior weights (w1, w2, w3)."""
+    """
+    Corner plot of the T=1 posterior weights, NORMALIZED per draw to shares
+    hat{w}_i = w_i / sum_j w_j (the convention of the paper's Figure 5: axes in
+    [0,1], bivariate support inside the simplex triangle).  The overall scale
+    of w is shared with the thresholds and is not what the figure is meant to
+    show; the shares are the ranking-relevant quantity.
+    """
     w = samples[:, :n_params]
-    labels = [r"$w_1$", r"$w_2$", r"$w_3$"]
+    w = w / w.sum(axis=1, keepdims=True)
+    labels = [r"$\hat{w}_1$", r"$\hat{w}_2$", r"$\hat{w}_3$"]
     if HAVE_CORNER:
         fig = corner_pkg.corner(w, labels=labels, show_titles=True,
                                 quantiles=[0.05, 0.5, 0.95],
+                                range=[(0, 1)] * w.shape[1],
                                 title_fmt=".3f", color=C_BAYES_FILL)
         fig.savefig(out_path, dpi=200)
         plt.close(fig)
