@@ -110,10 +110,12 @@ def run_inference_tool(data_path):
         items = step['items']
         cards = step['cards']
         
-        # Expand subrank into pairwise (adjacent-only primary likelihood, adjacent-v1)
+        # Expand subrank into adjacent gap observations (set-valued levels
+        # supported via 'levels'; singleton levels = plain alternative pairs)
         from experiments.simulation import expand_subrank
-        for p_win, p_lose, eta in expand_subrank(items, cards, expansion='adjacent'):
-            sampler.add_preference(p_win, p_lose, eta)
+        for upper, lower, eta in expand_subrank(step.get('levels', items), cards,
+                                                expansion='adjacent'):
+            sampler.add_gap(upper, lower, eta)
         
         # Run FTRL (MAP)
         print("Running FTRL (MAP estimation)...")

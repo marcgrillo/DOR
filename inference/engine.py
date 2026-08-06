@@ -84,28 +84,55 @@ class PreferenceSampler:
         self.gamma_a = 1.0
         self.gamma_b = 1.0
 
+        # Gap observations are stored as explicit feature-difference rows so
+        # that set-valued DOR levels (centroid features) and plain alternative
+        # pairs share one code path.  self.prefs keeps the index pairs for the
+        # alternative-level observations (introspection only).
+        self._xdiff_rows = []
+        self._eta_list = []
         self.prefs = np.empty((0, 3), dtype=int)
         self._update_diff_vectors()
         for up_idx, down_idx, eta in preferences:
             self.add_preference(up_idx, down_idx, eta)
 
-    def add_preference(self, up_idx, down_idx, eta):
+    def _validate_eta(self, eta, what):
         if not (0 <= eta <= self.n_max):
             raise ValueError(
-                f"eta={eta} outside [0, {self.n_max}] for pair ({up_idx}, {down_idx}); "
+                f"eta={eta} outside [0, {self.n_max}] for {what}; "
                 "responses must be raw card counts within the protocol cap"
             )
+
+    def add_preference(self, up_idx, down_idx, eta):
+        """Alternative-level gap: x = v(up) - v(down) (singleton levels)."""
+        self._validate_eta(eta, f"pair ({up_idx}, {down_idx})")
         new_pref = np.array([[up_idx, down_idx, eta]], dtype=int)
         self.prefs = np.vstack([self.prefs, new_pref]) if self.prefs.size > 0 else new_pref
+        self._xdiff_rows.append(self.X[int(up_idx)] - self.X[int(down_idx)])
+        self._eta_list.append(int(eta))
+        self._update_diff_vectors()
+
+    def add_gap(self, upper_members, lower_members, eta):
+        """
+        Set-valued DOR gap (levels of a complete preorder): the feature vector
+        is the difference of the level CENTROIDS,
+            x = mean_{a in upper} v(a) - mean_{b in lower} v(b),
+        so by linearity x^T w is the mean-utility gap between the two sets.
+        Singleton levels reproduce add_preference exactly.
+        """
+        upper = [int(i) for i in upper_members]
+        lower = [int(i) for i in lower_members]
+        self._validate_eta(eta, f"gap ({upper}, {lower})")
+        self._xdiff_rows.append(self.X[upper].mean(axis=0) - self.X[lower].mean(axis=0))
+        self._eta_list.append(int(eta))
         self._update_diff_vectors()
 
     def _update_diff_vectors(self):
-        if self.prefs.size == 0:
+        if not self._xdiff_rows:
             self.X_diff = np.empty((0, self.n_params))
             self.etas = np.empty(0, dtype=int)
         else:
-            self.X_diff = self.X[self.prefs[:, 0]] - self.X[self.prefs[:, 1]]
-            self.etas = self.prefs[:, 2]
+            self.X_diff = np.array(self._xdiff_rows)
+            self.etas = np.array(self._eta_list, dtype=int)
 
         # Convert to JAX arrays to avoid overhead during iterations
         self.jax_X_diff = jnp.array(self.X_diff)
@@ -145,7 +172,7 @@ class PreferenceSampler:
         return float(-jnp.sum(pred))
 
     def run_hmc(self, num_samples=200, num_warmup=200, seed=0, return_diagnostics=False):
-        if self.prefs.size == 0:
+        if len(self._eta_list) == 0:
             empty = np.empty((0, self.n_params + self.n_max))
             return (empty, {'divergences': 0, 'max_rhat': np.nan}) if return_diagnostics else empty
 

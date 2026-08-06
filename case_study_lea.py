@@ -185,9 +185,9 @@ def run_case(case_name, sessions, gamma):
     results = []
     for step, sess in enumerate(sessions, start=1):
         items = [IDX[name] for name in sess["items"]]
-        pairs = expand_subrank(items, sess["cards"], expansion="adjacent")
-        for up_idx, down_idx, eta in pairs:
-            sampler.add_preference(up_idx, down_idx, eta)
+        gaps = expand_subrank(items, sess["cards"], expansion="adjacent")
+        for upper, lower, eta in gaps:
+            sampler.add_gap(upper, lower, eta)
 
         t0 = time.perf_counter()
         w_map = sampler.find_map()
@@ -198,7 +198,7 @@ def run_case(case_name, sessions, gamma):
                                         seed=SEED_BASE + step, return_diagnostics=True)
         t_hmc = time.perf_counter() - t0
 
-        print(f"[{case_name} step {step}] pairs added: {pairs}")
+        print(f"[{case_name} step {step}] gaps added: {gaps}")
         print(f"[{case_name} step {step}] FTRL MAP in {t_map:.1f}s | "
               f"HMC {NUM_SAMPLES}/{NUM_WARMUP} in {t_hmc:.1f}s | "
               f"divergences={diag['divergences']}, max split-Rhat={diag['max_rhat']:.4f}")

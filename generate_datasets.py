@@ -151,7 +151,7 @@ class DatasetGenerator:
         except ValueError:
             return 1.0 * n_max # fallback
 
-    def generate_batch(self, F1, F2, num_steps, k_subset, n_max, target_consistency=1.0, utility_type='exponential', num_intervals=3, plot_utilities=True):
+    def generate_batch(self, F1, F2, num_steps, k_subset, n_max, target_consistency=1.0, utility_type='exponential', num_intervals=3, plot_utilities=True, merge_threshold=0.0):
         print(f"Generating datasets in '{self.output_dir}' with Consistency={target_consistency} (Utility={utility_type})...")
         
         for f1 in tqdm(F1, desc="Alternatives (F1)"):
@@ -168,7 +168,7 @@ class DatasetGenerator:
                         "runs[].true_utilities": "Ground truth utility values for each alternative.",
                         "runs[].weights": "Weights used in the utility function.",
                         "runs[].params": "Optional parameters (e.g., exponential curvature).",
-                        "runs[].subranks": "Sequence of elicited subranks. 'items' is indices ordered best to worst. 'cards' is blank cards between consecutive items."
+                        "runs[].subranks": "Sequence of elicited subranks. 'levels' is the declared complete preorder, best to worst: a list of SETS of mutually indifferent alternatives (DOR levels; alternatives whose true-utility gap is below merge_threshold share a level). 'items' is the flat concatenation of the levels. 'cards' is blank cards between consecutive levels."
                     },
                     "metadata": {
                         "f1": f1,
@@ -179,7 +179,8 @@ class DatasetGenerator:
                         "target_consistency": target_consistency,
                         "utility_type": utility_type,
                         "sigma": sigma,
-                        "n_runs": self.n_runs
+                        "n_runs": self.n_runs,
+                        "merge_threshold": merge_threshold
                     },
                     "runs": []
                 }
@@ -208,17 +209,39 @@ class DatasetGenerator:
                         # Variance of difference must be sigma^2, so variance of each item is sigma^2 / 2
                         noise_std = sigma / np.sqrt(2)
                         noisy_utilities = U[subset_indices] * n_max + np.random.normal(0, noise_std, current_k)
-                        
-                        # Generate Subrank
-                        sort_idx = np.argsort(-noisy_utilities)
-                        ranked_items = subset_indices[sort_idx].tolist()
-                        ranked_noisy_u = noisy_utilities[sort_idx]
-                        
-                        # Calculate Cards (eta) between consecutive elements
-                        cards = [int(np.clip(np.round(ranked_noisy_u[m] - ranked_noisy_u[m+1]), 0, n_max)) for m in range(current_k - 1)]
-                        
+
+                        # --- DOR levels (sets of indifferent alternatives) ---
+                        # The protocol groups alternatives the DM cannot tell apart:
+                        # single-linkage merge of consecutive (true-utility-sorted)
+                        # alternatives whose TRUE utility gap is < merge_threshold.
+                        # merge_threshold = 0 -> all levels are singletons and the
+                        # construction reduces exactly to the previous one.
+                        true_order = subset_indices[np.argsort(-U[subset_indices])]
+                        levels = [[int(true_order[0])]]
+                        for prev, cur in zip(true_order[:-1], true_order[1:]):
+                            if (U[prev] - U[cur]) < merge_threshold:
+                                levels[-1].append(int(cur))
+                            else:
+                                levels.append([int(cur)])
+
+                        # The DM declares the ORDER of the levels and the cards from
+                        # the (noisy) perceived level values = mean of the members'
+                        # noisy utilities (centroid convention, consistent with the
+                        # level-centroid likelihood features).
+                        noisy_map = {int(a): noisy_utilities[pos] for pos, a in enumerate(subset_indices)}
+                        level_vals = np.array([np.mean([noisy_map[a] for a in lv]) for lv in levels])
+                        lv_order = np.argsort(-level_vals)
+                        ranked_levels = [levels[o] for o in lv_order]
+                        ranked_vals = level_vals[lv_order]
+                        ranked_items = [a for lv in ranked_levels for a in lv]
+
+                        # Cards (eta) between consecutive LEVELS
+                        cards = [int(np.clip(np.round(ranked_vals[m] - ranked_vals[m+1]), 0, n_max))
+                                 for m in range(len(ranked_levels) - 1)]
+
                         subranks.append({
                             "items": ranked_items,
+                            "levels": ranked_levels,
                             "cards": cards
                         })
                         

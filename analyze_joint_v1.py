@@ -136,9 +136,10 @@ def hindsight_loss(dataset_fold, f1, f2, steps, hm, expansion):
         n_params = transformer.total_params
         batches = []
         for j in range(steps):
-            pairs = expand_subrank(dm_prefs[i][j]['items'], dm_prefs[i][j]['cards'], expansion)
-            X = Xf[[p[0] for p in pairs]] - Xf[[p[1] for p in pairs]]
-            batches.append((jnp.array(X), jnp.array([p[2] for p in pairs])))
+            sr = dm_prefs[i][j]
+            gaps = expand_subrank(sr.get('levels', sr['items']), sr['cards'], expansion)
+            X = np.array([Xf[u].mean(axis=0) - Xf[l].mean(axis=0) for u, l, _ in gaps])
+            batches.append((jnp.array(X), jnp.array([g[2] for g in gaps])))
         X_all = jnp.concatenate([b[0] for b in batches])
         e_all = jnp.concatenate([b[1] for b in batches])
         ndim = n_params + ETA_MAX

@@ -24,36 +24,46 @@ def get_sampler_state(sampler, alg, seed=0, return_diagnostics=False):
 
 def expand_subrank(items, cards, expansion='all', eta_cap=None):
     """
-    Expands a subrank into pairwise triples (winner, loser, eta).
+    Expands a subrank into gap observations (upper_members, lower_members, eta).
 
-    expansion='all': every ordered pair, eta = sum of cards between them
-                     (A > B > C -> A>B, A>C, B>C).
-    expansion='adjacent': only consecutive pairs, eta = cards separating them
-                     (A > B > C -> A>B, B>C).
+    items: declared best-to-worst LEVELS.  Each entry is either a single
+           alternative index (singleton level) or a list/tuple of indices --
+           a SET of mutually indifferent alternatives (DOR levels; the cards
+           sit between consecutive sets, plan C4 "level-centroid" path).
+    cards[m]: blank cards between level m and level m+1.
+
+    expansion='all': every ordered level pair, eta = sum of cards between them.
+    expansion='adjacent': only consecutive levels, eta = the single card count.
     eta_cap: right-censor eta into the top CLM category (eta_cap = n_max).
              Summed all-pairs scores can exceed the per-gap card cap (the legacy
              engine silently dropped those observations); with a cap they land in
              the right-censored top band P(latent >= theta_max), which is the
              CLM-consistent treatment for the ablation arm.
-    """
-    # Guards (plan items C4/C9): strict singleton levels, one card count per gap.
-    assert len(cards) == len(items) - 1, \
-        f"subrank malformed: {len(items)} items but {len(cards)} card gaps"
-    assert len(set(items)) == len(items), \
-        "multi-member levels/ties are not supported by the adjacent extraction (C9)"
 
-    pairs = []
+    Downstream, the feature vector of a gap is the difference of the level
+    CENTROIDS (PreferenceSampler.add_gap); for singleton levels this equals
+    the plain v(upper) - v(lower) pair difference.
+    """
+    levels = [list(map(int, x)) if isinstance(x, (list, tuple, np.ndarray)) else [int(x)]
+              for x in items]
+    assert len(cards) == len(levels) - 1, \
+        f"subrank malformed: {len(levels)} levels but {len(cards)} card gaps"
+    flat = [i for lv in levels for i in lv]
+    assert len(set(flat)) == len(flat), \
+        "alternative appears in more than one level of the same subrank"
+
+    gaps = []
     if expansion == 'adjacent':
-        for m in range(len(items) - 1):
-            pairs.append((int(items[m]), int(items[m + 1]), int(cards[m])))
+        for m in range(len(levels) - 1):
+            gaps.append((levels[m], levels[m + 1], int(cards[m])))
     else:
-        for start_idx in range(len(items)):
-            for end_idx in range(start_idx + 1, len(items)):
-                eta = sum(cards[start_idx:end_idx])
-                pairs.append((int(items[start_idx]), int(items[end_idx]), int(eta)))
+        for start_idx in range(len(levels)):
+            for end_idx in range(start_idx + 1, len(levels)):
+                eta = int(sum(cards[start_idx:end_idx]))
+                gaps.append((levels[start_idx], levels[end_idx], eta))
     if eta_cap is not None:
-        pairs = [(w, l, min(e, int(eta_cap))) for w, l, e in pairs]
-    return pairs
+        gaps = [(u, l, min(e, int(eta_cap))) for u, l, e in gaps]
+    return gaps
 
 def process_single_table(
     table,
@@ -97,12 +107,14 @@ def process_single_table(
 
         path_w = os.path.join(output_dir, f"{j}.npy")
 
-        # table_preferences is now a list of subranks for this run
+        # table_preferences is now a list of subranks for this run.
+        # 'levels' (list of lists, set-valued DOR) takes precedence over the
+        # legacy flat 'items' (strict order, singleton levels).
         subrank = table_preferences[j-1]
-        items = subrank['items']
+        items = subrank.get('levels', subrank['items'])
         cards = subrank['cards']
 
-        pairs = expand_subrank(items, cards, expansion, eta_cap=n_max)
+        gaps = expand_subrank(items, cards, expansion, eta_cap=n_max)
         # Distinct, reproducible seed per (table, step) — plan C15 "fresh seeds".
         step_seed = seed_base + 100003 * table_index + j
 
@@ -119,23 +131,22 @@ def process_single_table(
                     if os.path.exists(prev_path):
                         state_for_loss = np.load(prev_path)
             if state_for_loss is not None:
-                wins = [p[0] for p in pairs]
-                loses = [p[1] for p in pairs]
-                etas_new = np.array([p[2] for p in pairs], dtype=int)
-                X_new = feature_matrix[wins] - feature_matrix[loses]
+                X_new = np.array([feature_matrix[u].mean(axis=0) - feature_matrix[l].mean(axis=0)
+                                  for u, l, _ in gaps])
+                etas_new = np.array([g[2] for g in gaps], dtype=int)
                 batch_loss = sampler.log_predictive_loss(state_for_loss, X_new, etas_new)
-                np.save(loss_path, np.array([batch_loss, len(pairs)]))
+                np.save(loss_path, np.array([batch_loss, len(gaps)]))
 
         # Skip logic
         if os.path.exists(path_w) and not overwrite:
-            for p_win, p_lose, eta in pairs:
-                sampler.add_preference(p_win, p_lose, eta)
+            for upper, lower, eta in gaps:
+                sampler.add_gap(upper, lower, eta)
             prev_state = None  # reloaded lazily from disk if a later step needs it
             continue
 
-        # Add new preferences from the subrank
-        for p_win, p_lose, eta in pairs:
-            sampler.add_preference(p_win, p_lose, eta)
+        # Add new gap observations from the subrank
+        for upper, lower, eta in gaps:
+            sampler.add_gap(upper, lower, eta)
 
         # Run inference
         if algo_type == 'BAYES':
