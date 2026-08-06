@@ -1,16 +1,17 @@
 """
-adjacent-v1 grid campaign (migration plan C4-C15, Decisions 4/5/6 of 2026-08-06).
+joint-v1 grid campaign (migration plan C4-C15; Decisions 4/6 of 2026-08-06 and the
+revised Decision 5 of 2026-08-06 evening: theta_0 = 0, JOINT direction+intensity CLM).
 
-Runs FOUR arms under the NEW engine (theta_0 = -inf conditional CLM, rho = 1e-6,
+Runs FOUR arms under the NEW engine (theta_0 = 0 joint CLM, rho = 1e-6,
 fresh per-(table,step) seeds, prequential log-loss + HMC diagnostics recording):
 
-  FTRL_DOR_ADJV1 / BAYES_DOR_ADJV1  - adjacent-only likelihood (PRIMARY model)
-  FTRL_DOR_ALLV1 / BAYES_DOR_ALLV1  - all-pairs composite (ablation arm -> supplement)
+  FTRL_DOR_ADJJ1 / BAYES_DOR_ADJJ1  - adjacent-only likelihood (PRIMARY model)
+  FTRL_DOR_ALLJ1 / BAYES_DOR_ALLJ1  - all-pairs composite (ablation arm -> supplement)
 
 Sub_fold names carry the run tag so results can never mix with the legacy
 PASSIVE runs (old engine). Datasets are REUSED from datasets/grid_* (the DGP is
 unchanged by the migration; regeneration would alter them because the Thurstone
-noise is not seeded). Results npz: grid_results_adjacent_v1.npz.
+noise is not seeded). Results npz: grid_results_joint_v1.npz.
 
 Resumable: per-arm sample files are skipped if present; configs with all arms
 already in the npz are skipped.
@@ -37,7 +38,7 @@ if TEST_MODE:
     F_inc_list = [0]
     HM_0 = 4
 else:
-    print(">>> RUNNING FULL GRID (adjacent-v1) <<<")
+    print(">>> RUNNING FULL GRID (joint-v1) <<<")
     F1_list = [10, 20, 35, 50]
     F2_list = [3, 5, 7, 9]
     NUM_STEPS_list = [10]
@@ -47,16 +48,16 @@ else:
     HM_0 = 20
 
 ETA_MAX = 5
-RUN_TAG = 'adjacent-v1'
+RUN_TAG = 'joint-v1'
 RUN_SEED = 20260806  # global offset; per-(config, arm, table, step) seeds derived below
-SAVE_PATH = "grid_results_adjacent_v1_tiny.npz" if TEST_MODE else "grid_results_adjacent_v1.npz"
+SAVE_PATH = "grid_results_joint_v1_tiny.npz" if TEST_MODE else "grid_results_joint_v1.npz"
 
 # (sub_fold, expansion, uses_all_tables)
 ARMS = [
-    ('FTRL_DOR_ADJV1', 'adjacent', True),
-    ('BAYES_DOR_ADJV1', 'adjacent', False),
-    ('FTRL_DOR_ALLV1', 'all', True),
-    ('BAYES_DOR_ALLV1', 'all', False),
+    ('FTRL_DOR_ADJJ1', 'adjacent', True),
+    ('BAYES_DOR_ADJJ1', 'adjacent', False),
+    ('FTRL_DOR_ALLJ1', 'all', True),
+    ('BAYES_DOR_ALLJ1', 'all', False),
 ]
 
 
@@ -89,7 +90,7 @@ def run_single_config(config, hm_0):
     dataset_json = os.path.join("datasets", dataset_fold, f"f1_{f1}__f2_{f2}__nsteps_{steps}.json")
     if not os.path.exists(dataset_json):
         raise FileNotFoundError(
-            f"{dataset_json} missing - adjacent-v1 reuses the existing grid datasets; "
+            f"{dataset_json} missing - joint-v1 reuses the existing grid datasets; "
             "generate it explicitly first if this config is genuinely new")
 
     config_results = {}
@@ -134,7 +135,7 @@ def run_single_config(config, hm_0):
 
 
 def main():
-    print(f"Starting adjacent-v1 grid campaign ({len(ARMS)} arms)...")
+    print(f"Starting joint-v1 grid campaign ({len(ARMS)} arms)...")
     start_time = time.time()
 
     combinations = list(itertools.product(F1_list, F2_list, NUM_STEPS_list, A_R_list, K_list, F_inc_list))
@@ -160,7 +161,7 @@ def main():
 
     total_to_run = len(configs_to_run)
     if total_to_run == 0:
-        print("All adjacent-v1 configurations have already been run!")
+        print("All joint-v1 configurations have already been run!")
         return
     print(f"Configurations remaining: {total_to_run}")
 

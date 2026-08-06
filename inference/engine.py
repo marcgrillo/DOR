@@ -17,12 +17,15 @@ def robust_sigmoid(x):
 
 def _jax_log_prob_per_obs_untraced(omega, X_diff, etas, n_params, n_max, rho):
     """
-    Per-observation log P(eta | x, omega) under the conditional cumulative-link
-    model with theta_0 = -inf and theta_k = sum_{m<=k} (rho + delta_raw_m):
-      P(eta=0)          = sigma(theta_1 - u)
-      P(eta=k), 0<k<max = sigma(u - theta_k) - sigma(u - theta_{k+1})
-      P(eta=n_max)      = sigma(u - theta_{n_max})
-    Direction is conditioned on, not modelled (adjacent-v1 likelihood).
+    Per-observation log P(direction, eta | x, omega) under the JOINT
+    direction+intensity cumulative-link model with theta_0 = 0 and
+    theta_k = sum_{m<=k} (rho + delta_raw_m)  (authors' decision 2026-08-06):
+      P(obs direction, eta=0)     = sigma(u) - sigma(u - theta_1)      band (0, theta_1)
+      P(obs direction, eta=k)     = sigma(u - theta_k) - sigma(u - theta_{k+1})
+      P(obs direction, eta=n_max) = sigma(u - theta_{n_max})           right-censored
+    Categories sum to sigma(u); the remaining 1 - sigma(u) is the (never observed)
+    probability of the reversed direction, so each gap term models BOTH the observed
+    order of the pair and its card count (joint-v1 likelihood).
     """
     w = omega[:n_params]
     delta_raw = omega[n_params:]
@@ -43,7 +46,7 @@ def _jax_log_prob_per_obs_untraced(omega, X_diff, etas, n_params, n_max, rho):
         mask = (etas == k)
 
         if k == 0:
-            term = -jnp.logaddexp(0.0, u - theta[0])
+            term = stable_log_sigmoid_diff(theta[0], 0.0, u)
         elif k < n_max:
             term = stable_log_sigmoid_diff(theta[k], theta[k - 1], u)
         else:

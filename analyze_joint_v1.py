@@ -1,15 +1,15 @@
 """
-Analysis / export for the adjacent-v1 campaign (grid_results_adjacent_v1.npz).
+Analysis / export for the joint-v1 campaign (grid_results_joint_v1.npz).
 
-Produces (into figs/adjacent_v1/ and CSV at repo root):
-  1. grid_results_adjacent_v1.csv  - long-format export incl. per-step log-loss and runtimes
+Produces (into figs/joint_v1/ and CSV at repo root):
+  1. grid_results_joint_v1.csv  - long-format export incl. per-step log-loss and runtimes
   2. evolution_<metric>.png        - 4-arm step evolution per Inc level (pilot slice F1=10, F2=3, AR=K=3)
   3. logloss_cumulative.png        - cumulative prequential log-loss vs n_T (plan C14), with
                                      best-fixed-in-hindsight benchmark on the pilot cells
   4. fig_overall_v1.png / fig_factors_v1.png - paper-style figures for the ADJACENT arms
                                      (AR==K, T in {1,3,5,10}) over whatever configs are present
 
-Usage:  C:\\Users\\marco\\anaconda3\\python.exe analyze_adjacent_v1.py [--no-hindsight]
+Usage:  C:\\Users\\marco\\anaconda3\\python.exe analyze_joint_v1.py [--no-hindsight]
 """
 import os
 import re
@@ -21,21 +21,21 @@ import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 
-NPZ = "grid_results_adjacent_v1.npz"
-OUT_DIR = os.path.join("figs", "adjacent_v1")
-CSV_PATH = "grid_results_adjacent_v1.csv"
-ARMS = ['FTRL_DOR_ADJV1', 'BAYES_DOR_ADJV1', 'FTRL_DOR_ALLV1', 'BAYES_DOR_ALLV1']
+NPZ = "grid_results_joint_v1.npz"
+OUT_DIR = os.path.join("figs", "joint_v1")
+CSV_PATH = "grid_results_joint_v1.csv"
+ARMS = ['FTRL_DOR_ADJJ1', 'BAYES_DOR_ADJJ1', 'FTRL_DOR_ALLJ1', 'BAYES_DOR_ALLJ1']
 ARM_LABEL = {
-    'FTRL_DOR_ADJV1': 'FTRL-DOR (adjacent)',
-    'BAYES_DOR_ADJV1': 'BAYES-DOR (adjacent)',
-    'FTRL_DOR_ALLV1': 'FTRL-DOR (all-pairs)',
-    'BAYES_DOR_ALLV1': 'BAYES-DOR (all-pairs)',
+    'FTRL_DOR_ADJJ1': 'FTRL-DOR (adjacent)',
+    'BAYES_DOR_ADJJ1': 'BAYES-DOR (adjacent)',
+    'FTRL_DOR_ALLJ1': 'FTRL-DOR (all-pairs)',
+    'BAYES_DOR_ALLJ1': 'BAYES-DOR (all-pairs)',
 }
 ARM_STYLE = {
-    'FTRL_DOR_ADJV1': dict(color='#1f4fd8', ls='-', marker='o'),
-    'BAYES_DOR_ADJV1': dict(color='#e8810c', ls='-', marker='s'),
-    'FTRL_DOR_ALLV1': dict(color='#1f4fd8', ls='--', marker='o', alpha=0.55),
-    'BAYES_DOR_ALLV1': dict(color='#e8810c', ls='--', marker='s', alpha=0.55),
+    'FTRL_DOR_ADJJ1': dict(color='#1f4fd8', ls='-', marker='o'),
+    'BAYES_DOR_ADJJ1': dict(color='#e8810c', ls='-', marker='s'),
+    'FTRL_DOR_ALLJ1': dict(color='#1f4fd8', ls='--', marker='o', alpha=0.55),
+    'BAYES_DOR_ALLJ1': dict(color='#e8810c', ls='--', marker='s', alpha=0.55),
 }
 METRICS = ['asrs', 'asps', 'aios']
 PILOT = dict(F1=10, F2=3, AR=3, K=3)
@@ -49,7 +49,7 @@ def parse_config(config_str):
 
 def load_results():
     if not os.path.exists(NPZ):
-        sys.exit(f"{NPZ} not found - run run_grid_adjacent_v1.py first")
+        sys.exit(f"{NPZ} not found - run run_grid_joint_v1.py first")
     return np.load(NPZ, allow_pickle=True)['results'].item()
 
 
@@ -109,7 +109,7 @@ def plot_evolution(results):
             continue
         axes[0].set_ylabel(metric.upper())
         axes[0].legend(fontsize=8)
-        fig.suptitle(f"adjacent-v1 pilot slice (F1={PILOT['F1']}, F2={PILOT['F2']}, "
+        fig.suptitle(f"joint-v1 pilot slice (F1={PILOT['F1']}, F2={PILOT['F2']}, "
                      f"AR=K={PILOT['K']}): {metric.upper()}")
         fig.tight_layout()
         fig.savefig(os.path.join(OUT_DIR, f"evolution_{metric}.png"), dpi=150)
@@ -181,7 +181,7 @@ def plot_logloss(results, with_hindsight=True):
             st = ARM_STYLE[sub_fold]
             ax.plot(np.nanmean(n_t, axis=1), np.nanmean(cum, axis=1),
                     label=ARM_LABEL[sub_fold], **st)
-            if with_hindsight and sub_fold.endswith('ADJV1') and sub_fold.startswith('FTRL'):
+            if with_hindsight and sub_fold.endswith('ADJJ1') and sub_fold.startswith('FTRL'):
                 try:
                     hs = hindsight_loss(dataset_fold, PILOT['F1'], PILOT['F2'], 10,
                                         int(loss.shape[1]), 'adjacent')
@@ -212,7 +212,7 @@ def paper_figs(results):
         cfg = parse_config(config_str)
         if cfg['AR'] != cfg['K']:
             continue
-        for sub_fold in ['FTRL_DOR_ADJV1', 'BAYES_DOR_ADJV1']:
+        for sub_fold in ['FTRL_DOR_ADJJ1', 'BAYES_DOR_ADJJ1']:
             if sub_fold not in arms:
                 continue
             md = arms[sub_fold]
@@ -238,8 +238,8 @@ def paper_figs(results):
     # Overall bars
     fig, ax = plt.subplots(figsize=(6, 3.6))
     xs = np.arange(len(METRICS))
-    for off, method, color in [(-0.18, 'FTRL_DOR_ADJV1', '#1f4fd8'),
-                               (0.18, 'BAYES_DOR_ADJV1', '#e8810c')]:
+    for off, method, color in [(-0.18, 'FTRL_DOR_ADJJ1', '#1f4fd8'),
+                               (0.18, 'BAYES_DOR_ADJJ1', '#e8810c')]:
         means = [sel(method, m).mean() for m in METRICS]
         cis = [1.96 * sel(method, m).std() / np.sqrt(len(sel(method, m))) for m in METRICS]
         ax.bar(xs + off, means, width=0.34, yerr=cis, capsize=3,
@@ -248,7 +248,7 @@ def paper_figs(results):
             ax.text(x, v + 0.02, f"{v:.3f}", ha='center', fontsize=8)
     ax.set_xticks(xs); ax.set_xticklabels([m.upper() for m in METRICS])
     ax.set_ylim(0, 1); ax.legend(); ax.grid(axis='y', alpha=0.3)
-    ax.set_title("adjacent-v1: overall mean accuracy (AR=K, T in {1,3,5,10})")
+    ax.set_title("joint-v1: overall mean accuracy (AR=K, T in {1,3,5,10})")
     fig.tight_layout()
     fig.savefig(os.path.join(OUT_DIR, "fig_overall_v1.png"), dpi=150)
     plt.close(fig)
@@ -261,8 +261,8 @@ def paper_figs(results):
     for r, metric in enumerate(METRICS):
         for c, (fac, levels) in enumerate(factors):
             ax = axes[r, c]
-            for method, st in [('FTRL_DOR_ADJV1', ARM_STYLE['FTRL_DOR_ADJV1']),
-                               ('BAYES_DOR_ADJV1', ARM_STYLE['BAYES_DOR_ADJV1'])]:
+            for method, st in [('FTRL_DOR_ADJJ1', ARM_STYLE['FTRL_DOR_ADJJ1']),
+                               ('BAYES_DOR_ADJJ1', ARM_STYLE['BAYES_DOR_ADJJ1'])]:
                 means, cis, lv_present = [], [], []
                 for lv in levels:
                     vals = sel(method, metric, **{fac: lv})
@@ -283,7 +283,7 @@ def paper_figs(results):
                 ax.set_ylabel(metric.upper())
             ax.grid(alpha=0.3)
     axes[0, 0].legend(fontsize=7)
-    fig.suptitle("adjacent-v1: marginal effects (AR=K)")
+    fig.suptitle("joint-v1: marginal effects (AR=K)")
     fig.tight_layout()
     fig.savefig(os.path.join(OUT_DIR, "fig_factors_v1.png"), dpi=150)
     plt.close(fig)

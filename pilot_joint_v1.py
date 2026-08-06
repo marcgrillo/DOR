@@ -1,10 +1,10 @@
-"""Pilot slice of the adjacent-v1 campaign: the 4 configs F1=10, F2=3, S=10, AR=K=3,
-Inc in {0,15,35,50}, all 4 arms, merged into the same grid_results_adjacent_v1.npz
+"""Pilot slice of the joint-v1 campaign: the 4 configs F1=10, F2=3, S=10, AR=K=3,
+Inc in {0,15,35,50}, all 4 arms, merged into the same grid_results_joint_v1.npz
 (the full campaign will skip them on resume). Prints a final-step summary table."""
 import os
 import time
 import numpy as np
-import run_grid_adjacent_v1 as camp
+import run_grid_joint_v1 as camp
 
 PILOT = [(10, 3, 10, 3, 3, inc) for inc in [0, 15, 35, 50]]
 

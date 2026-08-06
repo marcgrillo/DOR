@@ -46,20 +46,21 @@ def generate_synthetic_data(num_alternatives=20, num_criteria=2, num_intervals=3
 
         u_diff = U_true[up_idx] - U_true[down_idx]
 
-        # Most likely 'eta' under the conditional CLM with theta_0 = -inf:
-        #   P(eta=0)          = sigma(theta_1 - u)
-        #   P(eta=k), 0<k<max = sigma(theta_{k+1} - u) - sigma(theta_k - u)
-        #   P(eta=n_max)      = 1 - sigma(theta_{n_max} - u)
+        # Most likely 'eta' under the JOINT direction+intensity CLM with theta_0 = 0
+        # (matches the engine's joint-v1 likelihood):
+        #   P(dir, eta=0)     = sigma(u) - sigma(u - theta_1)
+        #   P(dir, eta=k)     = sigma(u - theta_k) - sigma(u - theta_{k+1})
+        #   P(dir, eta=n_max) = sigma(u - theta_{n_max})
         best_eta = 0
         best_prob = -1
 
         for k in range(n_max + 1):
             if k == 0:
-                prob = expit(theta_true[0] - u_diff)
+                prob = expit(u_diff) - expit(u_diff - theta_true[0])
             elif k < n_max:
-                prob = expit(theta_true[k] - u_diff) - expit(theta_true[k-1] - u_diff)
+                prob = expit(u_diff - theta_true[k-1]) - expit(u_diff - theta_true[k])
             else:
-                prob = 1.0 - expit(theta_true[k-1] - u_diff)
+                prob = expit(u_diff - theta_true[k-1])
 
             if prob > best_prob:
                 best_prob = prob
