@@ -1,8 +1,11 @@
 """
-Paper-grade figures for the rewritten experimental section (main_new_base.tex).
+Paper-grade figures for the rewritten experimental section (main_new_base.tex),
+styled to match the June paper figures (fig_overall.png / fig_factors.png):
+large fonts, framed legends outside on top, descriptive column titles, bold
+row labels, dashed grid.
 
 Writes into paper_figs/:
-  fig_overall_v1.png       - overall mean accuracy bars, FTRL vs BAYES (adjacent)
+  fig_overall_v1.png       - overall mean-metric bars, FTRL vs BAYES (adjacent)
   fig_factors_v1.png       - 3x5 marginal-effect grid over the five factors
   fig_baselines_inc_v1.png - ASR/ASP/AIOS vs inconsistency for FTRL/BAYES/SMAA/LP
   fig_logloss_v1.png       - cumulative prequential log-loss vs n_T with the
@@ -19,7 +22,6 @@ import os
 import re
 import csv
 import glob
-import itertools
 import numpy as np
 import matplotlib
 matplotlib.use('Agg')
@@ -30,6 +32,7 @@ OUT = "paper_figs"
 METRICS = ['asrs', 'asps', 'aios']
 MET_LABEL = {'asrs': 'ASR', 'asps': 'ASP', 'aios': 'AIOS'}
 T_LEVELS = [1, 3, 5, 10]
+DPI = 200
 
 STYLE = {
     'FTRL_DOR_ADJJ1':  dict(color='#1f4fd8', ls='-',  marker='o', label='FTRL-DOR'),
@@ -39,8 +42,16 @@ STYLE = {
 }
 
 plt.rcParams.update({
-    'font.size': 10, 'axes.titlesize': 11, 'axes.labelsize': 10,
-    'legend.fontsize': 9, 'figure.dpi': 100,
+    'font.size': 15,
+    'axes.titlesize': 17,
+    'axes.labelsize': 16,
+    'xtick.labelsize': 14,
+    'ytick.labelsize': 14,
+    'legend.fontsize': 16,
+    'grid.linestyle': '--',
+    'grid.alpha': 0.5,
+    'lines.linewidth': 2.4,
+    'lines.markersize': 7,
 })
 
 
@@ -73,37 +84,42 @@ def mean_ci(v):
 
 # ---------------------------------------------------------------- fig_overall
 def fig_overall(results):
-    fig, ax = plt.subplots(figsize=(6.0, 3.4))
+    fig, ax = plt.subplots(figsize=(11, 6.2))
     xs = np.arange(len(METRICS))
     for off, arm in [(-0.18, 'FTRL_DOR_ADJJ1'), (0.18, 'BAYES_DOR_ADJJ1')]:
         st = STYLE[arm]
         means, cis = zip(*[mean_ci(pool(results, arm, m)) for m in METRICS])
-        ax.bar(xs + off, means, width=0.34, yerr=cis, capsize=3,
-               color=st['color'], label=st['label'])
+        ax.bar(xs + off, means, width=0.34, yerr=cis, capsize=5,
+               color=st['color'], label=st['label'],
+               error_kw=dict(lw=1.8, capthick=1.8))
         for x, v in zip(xs + off, means):
-            ax.text(x, v + 0.025, f"{v:.3f}", ha='center', fontsize=9)
+            ax.text(x, v + 0.03, f"{v:.3f}", ha='center', fontsize=17,
+                    fontweight='bold', color=st['color'])
     ax.set_xticks(xs)
-    ax.set_xticklabels([MET_LABEL[m] for m in METRICS])
+    ax.set_xticklabels([MET_LABEL[m] for m in METRICS], fontsize=18)
+    ax.tick_params(axis='y', labelsize=17)
     ax.set_ylim(0, 1)
-    ax.set_ylabel("mean accuracy")
-    ax.legend(frameon=False)
-    ax.grid(axis='y', alpha=0.3)
+    ax.set_ylabel("Mean metric value", fontsize=19)
+    ax.legend(loc='upper left', fontsize=18, framealpha=0.95)
+    ax.grid(axis='y')
+    ax.set_axisbelow(True)
     fig.tight_layout()
-    fig.savefig(os.path.join(OUT, "fig_overall_v1.png"), dpi=300)
+    fig.savefig(os.path.join(OUT, "fig_overall_v1.png"), dpi=DPI)
     plt.close(fig)
     print("Wrote paper_figs/fig_overall_v1.png")
 
 
 # ---------------------------------------------------------------- fig_factors
 def fig_factors(results):
-    factors = [('F1', [10, 20, 35, 50], r"$|A|$"),
-               ('F2', [3, 5, 7, 9], r"$m$"),
-               ('T', T_LEVELS, r"$T$"),
-               ('K', [3, 4, 5], r"$k$"),
-               ('Inc', [0, 15, 35, 50], r"$|F_{\mathrm{inc}}|$ (%)")]
-    fig, axes = plt.subplots(len(METRICS), len(factors), figsize=(13.5, 7.2), sharey='row')
+    factors = [('F1', [10, 20, 35, 50], r"Number of alternatives $|A|$"),
+               ('F2', [3, 5, 7, 9], r"Number of criteria $m$"),
+               ('T', T_LEVELS, r"Elicitation steps $T$"),
+               ('K', [3, 4, 5], r"Subset size $k$"),
+               ('Inc', [0, 15, 35, 50], "Inconsistency (%)")]
+    fig, axes = plt.subplots(len(METRICS), len(factors), figsize=(19.9, 10),
+                             sharey='row')
     for r, metric in enumerate(METRICS):
-        for c, (fac, levels, lab) in enumerate(factors):
+        for c, (fac, levels, title) in enumerate(factors):
             ax = axes[r, c]
             for arm in ['FTRL_DOR_ADJJ1', 'BAYES_DOR_ADJJ1']:
                 st = STYLE[arm]
@@ -114,18 +130,22 @@ def fig_factors(results):
                 means = np.array([s[0] for s in stats])
                 cis = np.array([s[1] for s in stats])
                 ax.plot(levels, means, color=st['color'], ls=st['ls'],
-                        marker=st['marker'], ms=4, label=st['label'])
+                        marker=st['marker'], label=st['label'])
                 ax.fill_between(levels, means - cis, means + cis,
-                                color=st['color'], alpha=0.12)
+                                color=st['color'], alpha=0.15)
             ax.set_xticks(levels)
-            if r == len(METRICS) - 1:
-                ax.set_xlabel(lab)
+            ax.tick_params(labelleft=True)
+            if r == 0:
+                ax.set_title(title, fontsize=16, pad=8)
             if c == 0:
-                ax.set_ylabel(MET_LABEL[metric])
-            ax.grid(alpha=0.3)
-    axes[0, 0].legend(frameon=False, fontsize=8)
-    fig.tight_layout()
-    fig.savefig(os.path.join(OUT, "fig_factors_v1.png"), dpi=300)
+                ax.set_ylabel(MET_LABEL[metric], fontsize=18, fontweight='bold')
+            ax.grid(True)
+            ax.set_axisbelow(True)
+    handles, labels = axes[0, 0].get_legend_handles_labels()
+    fig.legend(handles, labels, loc='upper center', bbox_to_anchor=(0.5, 1.0),
+               ncol=2, fontsize=17, frameon=True, columnspacing=2.5)
+    fig.tight_layout(rect=[0, 0, 1, 0.95])
+    fig.savefig(os.path.join(OUT, "fig_factors_v1.png"), dpi=DPI)
     plt.close(fig)
     print("Wrote paper_figs/fig_factors_v1.png")
 
@@ -134,7 +154,7 @@ def fig_factors(results):
 def fig_baselines(results):
     incs = [0, 15, 35, 50]
     arms = ['FTRL_DOR_ADJJ1', 'BAYES_DOR_ADJJ1', 'SMAA_DOR_ADJJ1', 'DORLP_DOR_ADJJ1']
-    fig, axes = plt.subplots(1, len(METRICS), figsize=(11.5, 3.3))
+    fig, axes = plt.subplots(1, len(METRICS), figsize=(16.5, 5.0))
     for ax, metric in zip(axes, METRICS):
         for arm in arms:
             st = STYLE[arm]
@@ -142,15 +162,18 @@ def fig_baselines(results):
             means = np.array([s[0] for s in stats])
             cis = np.array([s[1] for s in stats])
             ax.plot(incs, means, color=st['color'], ls=st['ls'],
-                    marker=st['marker'], ms=4.5, label=st['label'])
-            ax.fill_between(incs, means - cis, means + cis, color=st['color'], alpha=0.12)
+                    marker=st['marker'], label=st['label'])
+            ax.fill_between(incs, means - cis, means + cis, color=st['color'], alpha=0.15)
         ax.set_xticks(incs)
-        ax.set_xlabel(r"$|F_{\mathrm{inc}}|$ (%)")
-        ax.set_title(MET_LABEL[metric])
-        ax.grid(alpha=0.3)
-    axes[0].legend(frameon=False)
-    fig.tight_layout()
-    fig.savefig(os.path.join(OUT, "fig_baselines_inc_v1.png"), dpi=300)
+        ax.set_xlabel("Inconsistency (%)")
+        ax.set_title(MET_LABEL[metric], fontsize=18, pad=8)
+        ax.grid(True)
+        ax.set_axisbelow(True)
+    handles, labels = axes[0].get_legend_handles_labels()
+    fig.legend(handles, labels, loc='upper center', bbox_to_anchor=(0.5, 1.0),
+               ncol=4, fontsize=16, frameon=True, columnspacing=2.0)
+    fig.tight_layout(rect=[0, 0, 1, 0.90])
+    fig.savefig(os.path.join(OUT, "fig_baselines_inc_v1.png"), dpi=DPI)
     plt.close(fig)
     print("Wrote paper_figs/fig_baselines_inc_v1.png")
 
@@ -161,7 +184,7 @@ def fig_logloss(results):
     F1, F2, K = 10, 3, 5
     incs = [0, 50]
     n_tab = 5  # tables common to the BAYES and FTRL arms
-    fig, axes = plt.subplots(1, len(incs), figsize=(9.2, 3.4), sharex=True)
+    fig, axes = plt.subplots(1, len(incs), figsize=(14, 5.4), sharex=True)
     gaps = {}
     for ax, inc in zip(axes, incs):
         cs = f"F1={F1}_F2={F2}_S=10_AR={K}_K={K}_Inc={inc}"
@@ -175,19 +198,22 @@ def fig_logloss(results):
             m = cum.mean(axis=1)
             se = cum.std(axis=1) / np.sqrt(n_tab)
             ax.plot(n_t, m, color=st['color'], ls=st['ls'], marker=st['marker'],
-                    ms=4, label=st['label'])
-            ax.fill_between(n_t, m - 1.96 * se, m + 1.96 * se, color=st['color'], alpha=0.12)
+                    label=st['label'])
+            ax.fill_between(n_t, m - 1.96 * se, m + 1.96 * se, color=st['color'], alpha=0.15)
             gaps[(inc, arm, 'final')] = m[-1]
         hs = hindsight_loss(f"grid_{cs}", F1, F2, 10, n_tab, 'adjacent')
-        ax.plot(n_t, hs, color='k', ls=':', lw=1.8, label='best fixed in hindsight')
+        ax.plot(n_t, hs, color='k', ls=':', lw=2.6, label='Best fixed in hindsight')
         gaps[(inc, 'hindsight', 'final')] = hs[-1]
-        ax.set_title(rf"$|F_{{\mathrm{{inc}}}}| = {inc}\%$")
+        ax.set_title(f"Inconsistency = {inc}%", fontsize=17, pad=8)
         ax.set_xlabel(r"$n_T$ (cumulative gap observations)")
-        ax.grid(alpha=0.3)
-    axes[0].set_ylabel("cumulative log-loss")
-    axes[0].legend(frameon=False, fontsize=8)
-    fig.tight_layout()
-    fig.savefig(os.path.join(OUT, "fig_logloss_v1.png"), dpi=300)
+        ax.grid(True)
+        ax.set_axisbelow(True)
+    axes[0].set_ylabel("Cumulative log-loss")
+    handles, labels = axes[0].get_legend_handles_labels()
+    fig.legend(handles, labels, loc='upper center', bbox_to_anchor=(0.5, 1.0),
+               ncol=3, fontsize=15, frameon=True, columnspacing=1.8)
+    fig.tight_layout(rect=[0, 0, 1, 0.89])
+    fig.savefig(os.path.join(OUT, "fig_logloss_v1.png"), dpi=DPI)
     plt.close(fig)
     print("Wrote paper_figs/fig_logloss_v1.png")
     for inc in incs:
@@ -220,7 +246,7 @@ def fig_sets_tau():
         print(f"  tau={tau:g}: mean levels/session {np.mean(lv):.2f}, "
               f"multi-level share {np.mean(ml) * 100:.1f}%")
 
-    fig, axes = plt.subplots(1, len(METRICS), figsize=(11.5, 3.5))
+    fig, axes = plt.subplots(1, len(METRICS), figsize=(16.5, 5.4))
     for ax, metric in zip(axes, METRICS):
         for arm, st in arms:
             means, cis = [], []
@@ -236,20 +262,21 @@ def fig_sets_tau():
                           f"(n={np.sum(~np.isnan(v))}/{len(v)})")
             means = np.array(means); cis = np.array(cis)
             ax.plot(taus, means, color=st['color'], ls=st['ls'], marker=st['marker'],
-                    ms=4.5, label=st['label'])
-            ax.fill_between(taus, means - cis, means + cis, color=st['color'], alpha=0.12)
+                    label=st['label'])
+            ax.fill_between(taus, means - cis, means + cis, color=st['color'], alpha=0.15)
         ax.set_xticks(taus)
-        ax.set_xlabel(r"merge threshold $\tau$")
-        ax.set_title(MET_LABEL[metric])
-        ax.grid(alpha=0.3)
+        ax.set_xlabel(r"Merge threshold $\tau$")
+        ax.set_title(MET_LABEL[metric], fontsize=18, pad=30)
+        ax.grid(True)
+        ax.set_axisbelow(True)
         sec = ax.secondary_xaxis('top')
         sec.set_xticks(taus)
-        sec.set_xticklabels([f"{slev[t]:.1f}" for t in taus], fontsize=8)
-        if metric == 'asrs':
-            sec.set_xlabel(r"mean levels per session $\bar{s}$", fontsize=8)
-    axes[0].legend(frameon=False)
-    fig.tight_layout()
-    fig.savefig(os.path.join(OUT, "fig_sets_tau_v1.png"), dpi=300)
+        sec.set_xticklabels([rf"$\bar{{s}}={slev[t]:.1f}$" for t in taus], fontsize=12)
+    handles, labels = axes[0].get_legend_handles_labels()
+    fig.legend(handles, labels, loc='upper center', bbox_to_anchor=(0.5, 1.0),
+               ncol=2, fontsize=16, frameon=True, columnspacing=2.5)
+    fig.tight_layout(rect=[0, 0, 1, 0.88])
+    fig.savefig(os.path.join(OUT, "fig_sets_tau_v1.png"), dpi=DPI)
     plt.close(fig)
     print("Wrote paper_figs/fig_sets_tau_v1.png")
 
