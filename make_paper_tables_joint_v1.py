@@ -112,7 +112,8 @@ def write_marginal_table(results, arms, col_names, caption, label, path):
 
 
 def write_overall_by_inc_table(results, arms, col_names, caption, label, path):
-    """Compact comparison: 'all' row + one row per Inc level."""
+    """Compact comparison, transposed: one metric block of rows (all + by-Inc)
+    per metric, methods as columns -- fits \\textwidth even with 6 methods."""
     present = [a for a in arms if any(a in v for v in results.values())]
     if len(present) < len(arms):
         missing = [a for a in arms if a not in present]
@@ -121,30 +122,24 @@ def write_overall_by_inc_table(results, arms, col_names, caption, label, path):
     if not present:
         print(f"SKIP {path}: no requested arms present")
         return
-    ncols = len(present) * len(METRICS)
     lines = [
         "\\begin{table}[htp]",
         "    \\centering",
         f"    \\caption{{{caption}}}",
         f"    \\label{{{label}}}",
-        "\\begin{tabularx}{\\textwidth}{l|" + "C" * ncols + "}",
+        "\\begin{tabularx}{\\textwidth}{ll|" + "C" * len(present) + "}",
         "\\toprule",
-        "\\multirow{2}{*}{Inc.}&" + "&".join(
-            f"\\multicolumn{{{len(present)}}}{{c}}{{{m}}}" for m in ['ASR', 'ASP', 'AIOS']) + "\\\\",
+        "&$|F_{\\text{inc}}|$&" + "&".join(names) + "\\\\",
+        "\\midrule",
     ]
-    cml = []
-    for i in range(len(METRICS)):
-        a = 2 + i * len(present)
-        cml.append(f"\\cmidrule(lr){{{a}-{a + len(present) - 1}}}")
-    lines.append("".join(cml))
-    lines.append("&" + "&".join(names * len(METRICS)) + "\\\\")
-    lines.append("\\midrule")
-    lines.append("all & " + " & ".join(
-        cell(pool(results, a, m)) for m in METRICS for a in present) + " \\\\")
-    lines.append("\\midrule")
-    for inc in [0, 15, 35, 50]:
-        lines.append(f"{inc}\\% & " + " & ".join(
-            cell(pool(results, a, m, Inc=inc)) for m in METRICS for a in present) + " \\\\")
+    for mi, (metric, mname) in enumerate(zip(METRICS, ['ASR', 'ASP', 'AIOS'])):
+        if mi:
+            lines.append("\\midrule")
+        lines.append(f"\\multirow{{5}}{{*}}{{{mname}}}&all & " + " & ".join(
+            cell(pool(results, a, metric)) for a in present) + " \\\\")
+        for inc in [0, 15, 35, 50]:
+            lines.append(f"&${inc}\\%$ & " + " & ".join(
+                cell(pool(results, a, metric, Inc=inc)) for a in present) + " \\\\")
     lines += ["\\bottomrule", "\\end{tabularx}", "\\end{table}"]
     with open(path, "w") as f:
         f.write("\n".join(lines) + "\n")
@@ -186,10 +181,12 @@ def main():
         arms=['FTRL_DOR_ADJJ1', 'BAYES_DOR_ADJJ1', 'SMAA_DOR_ADJJ1',
               'DORLP_DOR_ADJJ1', 'FTRLDIR_DOR_ADJJ1', 'BAYESDIR_DOR_ADJJ1'],
         col_names=['FTRL', 'BAYES', 'SMAA', 'LP', 'FTRL$_{\\text{dir}}$', 'BAYES$_{\\text{dir}}$'],
-        caption=("Baselines and ablations on the same simulated data: SMAA-DOR "
-                 "(corrente2025deck), the original DOR linear programme (LP, barbati2024deck) "
-                 "and the direction-only ablation (subscript dir; card counts ignored), "
-                 "against FTRL-DOR and BAYES-DOR."),
+        caption=("Comparison of the proposed estimators (FTRL-DOR, BAYES-DOR) with SMAA-DOR "
+                 "\\citep{corrente2025deck}, the original DOR linear programme "
+                 "\\citep[LP,][]{barbati2024deck} and the direction-only ablation of "
+                 "Section~\\ref{sec:sim_direction} (subscript dir: card counts ignored), on the "
+                 "same simulated data. Mean of each metric with $95\\%$ confidence interval, "
+                 "over the whole grid (\\emph{all}) and by inconsistency level."),
         label="tab:baselines",
         path=os.path.join(OUT_DIR, "tab_baselines_joint_v1.tex"),
     )
