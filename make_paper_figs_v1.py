@@ -180,39 +180,61 @@ def fig_baselines(results):
 
 # -------------------------------------------------------------- fig_logloss
 def fig_logloss(results):
+    """Regret (cumulative prequential loss minus best-fixed-in-hindsight loss)
+    on a log n_T axis -- logarithmic growth = straight line."""
+    from matplotlib.ticker import ScalarFormatter
     from analyze_joint_v1 import hindsight_loss
     F1, F2, K = 10, 3, 5
     incs = [0, 50]
     n_tab = 5  # tables common to the BAYES and FTRL arms
-    fig, axes = plt.subplots(1, len(incs), figsize=(14, 5.4), sharex=True)
+    fig, axes = plt.subplots(1, len(incs), figsize=(14, 5.6))
     gaps = {}
     for ax, inc in zip(axes, incs):
         cs = f"F1={F1}_F2={F2}_S=10_AR={K}_K={K}_Inc={inc}"
         arms = results.get(cs, {})
-        n_t = None
+        hs_curves = hindsight_loss(f"grid_{cs}", F1, F2, 10, n_tab, 'adjacent',
+                                   return_curves=True)   # n_tab x steps
+        gaps[(inc, 'hindsight', 'final')] = hs_curves.mean(axis=0)[-1]
+        n_t, reg_top, ftrl_rm = None, 0.0, None
         for arm in ['FTRL_DOR_ADJJ1', 'BAYES_DOR_ADJJ1']:
             st = STYLE[arm]
             loss = np.array(arms[arm]['log_loss'], dtype=float)[:, :n_tab]  # steps x tab x 2
             cum = np.cumsum(loss[:, :, 0], axis=0)
             n_t = np.cumsum(loss[:, :, 1], axis=0).mean(axis=1)
-            m = cum.mean(axis=1)
-            se = cum.std(axis=1) / np.sqrt(n_tab)
-            ax.plot(n_t, m, color=st['color'], ls=st['ls'], marker=st['marker'],
+            gaps[(inc, arm, 'final')] = cum.mean(axis=1)[-1]
+            reg = cum - hs_curves.T                       # steps x tab
+            rm = reg.mean(axis=1)
+            rse = reg.std(axis=1) / np.sqrt(n_tab)
+            ax.plot(n_t, rm, color=st['color'], ls=st['ls'], marker=st['marker'],
                     label=st['label'])
-            ax.fill_between(n_t, m - 1.96 * se, m + 1.96 * se, color=st['color'], alpha=0.15)
-            gaps[(inc, arm, 'final')] = m[-1]
-        hs = hindsight_loss(f"grid_{cs}", F1, F2, 10, n_tab, 'adjacent')
-        ax.plot(n_t, hs, color='k', ls=':', lw=2.6, label='Best fixed in hindsight')
-        gaps[(inc, 'hindsight', 'final')] = hs[-1]
+            ax.fill_between(n_t, rm - 1.96 * rse, rm + 1.96 * rse,
+                            color=st['color'], alpha=0.15)
+            reg_top = max(reg_top, np.max(rm + 1.96 * rse))
+            if arm == 'FTRL_DOR_ADJJ1':
+                ftrl_rm = rm
+        # references: straight-in-log-x chord through the FTRL endpoints, and
+        # linear growth anchored at the first FTRL point (exits the panel top)
+        guide = ftrl_rm[0] + (ftrl_rm[-1] - ftrl_rm[0]) \
+            * (np.log(n_t) - np.log(n_t[0])) / (np.log(n_t[-1]) - np.log(n_t[0]))
+        ax.plot(n_t, guide, color='0.45', ls='--', lw=1.8,
+                label=r'$\propto \log n_T$ reference')
+        lin = ftrl_rm[0] * n_t / n_t[0]
+        ax.plot(n_t, lin, color='0.45', ls=':', lw=2.2,
+                label=r'$\propto n_T$ reference')
+        ax.set_ylim(top=reg_top * 1.18)
         ax.set_title(f"Inconsistency = {inc}%", fontsize=17, pad=8)
-        ax.set_xlabel(r"$n_T$ (cumulative gap observations)")
+        ax.set_xscale('log')
+        ax.set_xticks([4, 8, 16, 40])
+        ax.xaxis.set_major_formatter(ScalarFormatter())
+        ax.minorticks_off()
+        ax.set_xlabel(r"$n_T$ (cumulative gap observations, log scale)")
         ax.grid(True)
         ax.set_axisbelow(True)
-    axes[0].set_ylabel("Cumulative log-loss")
+    axes[0].set_ylabel("Regret")
     handles, labels = axes[0].get_legend_handles_labels()
     fig.legend(handles, labels, loc='upper center', bbox_to_anchor=(0.5, 1.0),
-               ncol=3, fontsize=15, frameon=True, columnspacing=1.8)
-    fig.tight_layout(rect=[0, 0, 1, 0.89])
+               ncol=4, fontsize=14, frameon=True, columnspacing=1.6)
+    fig.tight_layout(rect=[0, 0, 1, 0.88])
     fig.savefig(os.path.join(OUT, "fig_logloss_v1.png"), dpi=DPI)
     plt.close(fig)
     print("Wrote paper_figs/fig_logloss_v1.png")
@@ -266,16 +288,17 @@ def fig_sets_tau():
             ax.fill_between(taus, means - cis, means + cis, color=st['color'], alpha=0.15)
         ax.set_xticks(taus)
         ax.set_xlabel(r"Merge threshold $\tau$")
-        ax.set_title(MET_LABEL[metric], fontsize=18, pad=30)
+        ax.set_title(MET_LABEL[metric], fontsize=18, pad=52)
         ax.grid(True)
         ax.set_axisbelow(True)
         sec = ax.secondary_xaxis('top')
         sec.set_xticks(taus)
-        sec.set_xticklabels([rf"$\bar{{s}}={slev[t]:.1f}$" for t in taus], fontsize=12)
+        sec.set_xticklabels([f"{slev[t]:.1f}" for t in taus], fontsize=12)
+        sec.set_xlabel(r"Mean levels per session $\bar{s}$", fontsize=13, labelpad=7)
     handles, labels = axes[0].get_legend_handles_labels()
     fig.legend(handles, labels, loc='upper center', bbox_to_anchor=(0.5, 1.0),
                ncol=2, fontsize=16, frameon=True, columnspacing=2.5)
-    fig.tight_layout(rect=[0, 0, 1, 0.88])
+    fig.tight_layout(rect=[0, 0, 1, 0.90])
     fig.savefig(os.path.join(OUT, "fig_sets_tau_v1.png"), dpi=DPI)
     plt.close(fig)
     print("Wrote paper_figs/fig_sets_tau_v1.png")

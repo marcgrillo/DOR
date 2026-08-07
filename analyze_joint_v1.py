@@ -117,9 +117,10 @@ def plot_evolution(results):
         print(f"Wrote {OUT_DIR}/evolution_{metric}.png")
 
 
-def hindsight_loss(dataset_fold, f1, f2, steps, hm, expansion):
-    """Best-fixed-in-hindsight cumulative loss per step (mean over tables):
-    ML fit (no prior) on ALL steps' data, then its cumulative batch losses."""
+def hindsight_loss(dataset_fold, f1, f2, steps, hm, expansion, return_curves=False):
+    """Best-fixed-in-hindsight cumulative loss per step (mean over tables, or
+    the per-table curves if return_curves): ML fit (no prior) on ALL steps'
+    data, then its cumulative batch losses."""
     from scipy.optimize import minimize as sp_minimize
     import jax, jax.numpy as jnp
     from common import utils
@@ -159,7 +160,7 @@ def hindsight_loss(dataset_fold, f1, f2, steps, hm, expansion):
         per_step = [float(-jnp.sum(_jax_log_prob_per_obs(om_star, X, e, n_params, ETA_MAX, RHO)))
                     for X, e in batches]
         curves.append(np.cumsum(per_step))
-    return np.mean(curves, axis=0)
+    return np.array(curves) if return_curves else np.mean(curves, axis=0)
 
 
 def plot_logloss(results, with_hindsight=True):
