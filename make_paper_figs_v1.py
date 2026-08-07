@@ -294,7 +294,7 @@ def fig_sets_tau():
         sec = ax.secondary_xaxis('top')
         sec.set_xticks(taus)
         sec.set_xticklabels([f"{slev[t]:.1f}" for t in taus], fontsize=12)
-        sec.set_xlabel(r"Mean levels per session $\bar{s}$", fontsize=13, labelpad=7)
+        sec.set_xlabel(r"Mean levels per session $\bar{l}$", fontsize=13, labelpad=7)
     handles, labels = axes[0].get_legend_handles_labels()
     fig.legend(handles, labels, loc='upper center', bbox_to_anchor=(0.5, 1.0),
                ncol=2, fontsize=16, frameon=True, columnspacing=2.5)
