@@ -5,11 +5,10 @@ large fonts, framed legends outside on top, descriptive column titles, bold
 row labels, dashed grid.
 
 Writes into paper_figs/:
-  fig_overall_v1.png       - overall mean-metric bars, FTRL vs BAYES (adjacent)
-  fig_factors_v1.png       - 3x5 marginal-effect grid over the five factors
-  fig_baselines_inc_v1.png - ASR/ASP/AIOS vs inconsistency for FTRL/BAYES/SMAA/LP
-  fig_logloss_v1.png       - cumulative prequential log-loss vs n_T with the
-                             best-fixed-in-hindsight comparator (Inc = 0 / 50)
+  fig_overall_v1.png       - overall mean-metric bars, all six compared arms
+  fig_factors_v1.png       - 3x5 marginal-effect grid over the five factors,
+                             all six arms (no CI bands for the dir ablations)
+  fig_logloss_v1.png       - regret vs n_T (log axis) with log/linear references
   fig_sets_tau_v1.png      - set-valued sessions: metrics vs merge threshold tau
 
 Also prints the aggregate numbers quoted in the text: HMC diagnostics for the
@@ -39,7 +38,14 @@ STYLE = {
     'BAYES_DOR_ADJJ1': dict(color='#e8810c', ls='--', marker='s', label='BAYES-DOR'),
     'SMAA_DOR_ADJJ1':  dict(color='#2e8b57', ls='-.', marker='^', label='SMAA-DOR'),
     'DORLP_DOR_ADJJ1': dict(color='#777777', ls=':',  marker='D', label='DOR (LP)'),
+    'FTRLDIR_DOR_ADJJ1':  dict(color='#8fa9ec', ls='-',  marker='o',
+                               label=r'FTRL$_{\mathrm{dir}}$'),
+    'BAYESDIR_DOR_ADJJ1': dict(color='#f4bc7d', ls='--', marker='s',
+                               label=r'BAYES$_{\mathrm{dir}}$'),
 }
+ARMS_ALL = ['FTRL_DOR_ADJJ1', 'BAYES_DOR_ADJJ1', 'SMAA_DOR_ADJJ1',
+            'DORLP_DOR_ADJJ1', 'FTRLDIR_DOR_ADJJ1', 'BAYESDIR_DOR_ADJJ1']
+DIR_ARMS = {'FTRLDIR_DOR_ADJJ1', 'BAYESDIR_DOR_ADJJ1'}
 
 plt.rcParams.update({
     'font.size': 15,
@@ -84,98 +90,102 @@ def mean_ci(v):
 
 # ---------------------------------------------------------------- fig_overall
 def fig_overall(results):
-    fig, ax = plt.subplots(figsize=(11, 6.2))
-    xs = np.arange(len(METRICS))
-    for off, arm in [(-0.18, 'FTRL_DOR_ADJJ1'), (0.18, 'BAYES_DOR_ADJJ1')]:
-        st = STYLE[arm]
-        means, cis = zip(*[mean_ci(pool(results, arm, m)) for m in METRICS])
-        ax.bar(xs + off, means, width=0.34, yerr=cis, capsize=5,
-               color=st['color'], label=st['label'],
-               error_kw=dict(lw=1.8, capthick=1.8))
-        for x, v in zip(xs + off, means):
-            ax.text(x, v + 0.03, f"{v:.3f}", ha='center', fontsize=17,
-                    fontweight='bold', color=st['color'])
-    ax.set_xticks(xs)
-    ax.set_xticklabels([MET_LABEL[m] for m in METRICS], fontsize=18)
-    ax.tick_params(axis='y', labelsize=17)
-    ax.set_ylim(0, 1)
-    ax.set_ylabel("Mean metric value", fontsize=19)
-    ax.legend(loc='upper left', fontsize=18, framealpha=0.95)
-    ax.grid(axis='y')
-    ax.set_axisbelow(True)
-    fig.tight_layout()
+    """One panel per metric, each with its own vertical scale and the methods
+    sorted from best to worst, so differences stay visible on every metric."""
+    from matplotlib.patches import Patch
+    fig, axes = plt.subplots(1, len(METRICS), figsize=(16.5, 5.8))
+    for ax, met in zip(axes, METRICS):
+        stats = {arm: mean_ci(pool(results, arm, met)) for arm in ARMS_ALL}
+        order = sorted(ARMS_ALL, key=lambda a: -stats[a][0])
+        means = np.array([stats[a][0] for a in order])
+        cis = np.array([stats[a][1] for a in order])
+        xs = np.arange(len(order))
+        ax.bar(xs, means, width=0.72, yerr=cis, capsize=4,
+               color=[STYLE[a]['color'] for a in order],
+               error_kw=dict(lw=1.6, capthick=1.6))
+        lo = float(np.min(means - cis))
+        hi = float(np.max(means + cis))
+        pad = 0.18 * (hi - lo)
+        ax.set_ylim(max(0.0, lo - 1.2 * pad), hi + 2.6 * pad)
+        for x, v, c, a in zip(xs, means, cis, order):
+            ax.text(x, v + c + 0.3 * pad, f"{v:.3f}", ha='center', fontsize=14,
+                    fontweight='bold', color=STYLE[a]['color'])
+        ax.set_xticks([])
+        ax.tick_params(axis='y', labelsize=15)
+        ax.set_title(MET_LABEL[met], fontsize=20, pad=8)
+        ax.grid(axis='y')
+        ax.set_axisbelow(True)
+    axes[0].set_ylabel("Mean metric value", fontsize=18)
+    handles = [Patch(facecolor=STYLE[a]['color'], label=STYLE[a]['label'])
+               for a in ARMS_ALL]
+    fig.legend(handles=handles, loc='upper center', bbox_to_anchor=(0.5, 1.0),
+               ncol=6, fontsize=16, frameon=True, columnspacing=1.3)
+    fig.tight_layout(rect=[0, 0, 1, 0.89])
     fig.savefig(os.path.join(OUT, "fig_overall_v1.png"), dpi=DPI)
     plt.close(fig)
     print("Wrote paper_figs/fig_overall_v1.png")
 
 
 # ---------------------------------------------------------------- fig_factors
-def fig_factors(results):
-    factors = [('F1', [10, 20, 35, 50], r"Number of alternatives $|A|$"),
-               ('F2', [3, 5, 7, 9], r"Number of criteria $m$"),
-               ('T', T_LEVELS, r"Elicitation steps $T$"),
-               ('K', [3, 4, 5], r"Subset size $k$"),
+def _fig_factors_group(results, arms, fname):
+    """Factors as rows, metrics as columns (portrait layout); grouped bars
+    sorted best-to-worst within each level group; per-panel vertical scale."""
+    from matplotlib.patches import Patch
+    factors = [('F1', [10, 20, 35, 50], "Number of\nalternatives $|A|$"),
+               ('F2', [3, 5, 7, 9], "Number of\ncriteria $m$"),
+               ('T', T_LEVELS, "Elicitation\nsteps $T$"),
+               ('K', [3, 4, 5], "Subset size $k$"),
                ('Inc', [0, 15, 35, 50], "Inconsistency (%)")]
-    fig, axes = plt.subplots(len(METRICS), len(factors), figsize=(19.9, 10),
-                             sharey='row')
-    for r, metric in enumerate(METRICS):
-        for c, (fac, levels, title) in enumerate(factors):
+    fig, axes = plt.subplots(len(factors), len(METRICS), figsize=(13.5, 15.5))
+    n_arms = len(arms)
+    bw = 0.24
+    offs = (np.arange(n_arms) - (n_arms - 1) / 2) * bw
+    for r, (fac, levels, title) in enumerate(factors):
+        for c, metric in enumerate(METRICS):
             ax = axes[r, c]
-            for arm in ['FTRL_DOR_ADJJ1', 'BAYES_DOR_ADJJ1']:
-                st = STYLE[arm]
-                if fac == 'T':
-                    stats = [mean_ci(pool(results, arm, metric, T=lv)) for lv in levels]
-                else:
-                    stats = [mean_ci(pool(results, arm, metric, **{fac: lv})) for lv in levels]
-                means = np.array([s[0] for s in stats])
-                cis = np.array([s[1] for s in stats])
-                ax.plot(levels, means, color=st['color'], ls=st['ls'],
-                        marker=st['marker'], label=st['label'])
-                ax.fill_between(levels, means - cis, means + cis,
-                                color=st['color'], alpha=0.15)
-            ax.set_xticks(levels)
-            ax.tick_params(labelleft=True)
+            xs = np.arange(len(levels))
+            lo, hi = np.inf, -np.inf
+            for j, lv in enumerate(levels):
+                filt = dict(T=lv) if fac == 'T' else {fac: lv}
+                stats = {arm: mean_ci(pool(results, arm, metric, **filt))
+                         for arm in arms}
+                # within each level group, bars sorted from best to worst
+                order = sorted(arms, key=lambda a: -stats[a][0])
+                for pos, arm in enumerate(order):
+                    mean, ci = stats[arm]
+                    ax.bar(j + offs[pos], mean, width=bw * 0.9, yerr=ci,
+                           capsize=2.5, color=STYLE[arm]['color'],
+                           error_kw=dict(lw=1.1, capthick=1.1))
+                    lo = min(lo, mean - ci)
+                    hi = max(hi, mean + ci)
+            pad = 0.12 * (hi - lo)
+            ax.set_ylim(max(0.0, lo - pad), hi + pad)
+            ax.set_xticks(xs)
+            ax.set_xticklabels([str(lv) for lv in levels], fontsize=15)
+            ax.tick_params(axis='y', labelsize=14)
             if r == 0:
-                ax.set_title(title, fontsize=16, pad=8)
+                ax.set_title(MET_LABEL[metric], fontsize=20, fontweight='bold', pad=10)
             if c == 0:
-                ax.set_ylabel(MET_LABEL[metric], fontsize=18, fontweight='bold')
-            ax.grid(True)
+                ax.set_ylabel(title, fontsize=16)
+            ax.grid(axis='y')
             ax.set_axisbelow(True)
-    handles, labels = axes[0, 0].get_legend_handles_labels()
-    fig.legend(handles, labels, loc='upper center', bbox_to_anchor=(0.5, 1.0),
-               ncol=2, fontsize=17, frameon=True, columnspacing=2.5)
-    fig.tight_layout(rect=[0, 0, 1, 0.95])
-    fig.savefig(os.path.join(OUT, "fig_factors_v1.png"), dpi=DPI)
+    handles = [Patch(facecolor=STYLE[a]['color'], label=STYLE[a]['label'])
+               for a in arms]
+    fig.legend(handles=handles, loc='upper center', bbox_to_anchor=(0.5, 1.0),
+               ncol=3, fontsize=18, frameon=True, columnspacing=2.0)
+    fig.tight_layout(rect=[0, 0, 1, 0.96])
+    fig.savefig(os.path.join(OUT, fname), dpi=DPI)
     plt.close(fig)
-    print("Wrote paper_figs/fig_factors_v1.png")
+    print(f"Wrote paper_figs/{fname}")
 
 
-# ---------------------------------------------------------- fig_baselines_inc
-def fig_baselines(results):
-    incs = [0, 15, 35, 50]
-    arms = ['FTRL_DOR_ADJJ1', 'BAYES_DOR_ADJJ1', 'SMAA_DOR_ADJJ1', 'DORLP_DOR_ADJJ1']
-    fig, axes = plt.subplots(1, len(METRICS), figsize=(16.5, 5.0))
-    for ax, metric in zip(axes, METRICS):
-        for arm in arms:
-            st = STYLE[arm]
-            stats = [mean_ci(pool(results, arm, metric, Inc=inc)) for inc in incs]
-            means = np.array([s[0] for s in stats])
-            cis = np.array([s[1] for s in stats])
-            ax.plot(incs, means, color=st['color'], ls=st['ls'],
-                    marker=st['marker'], label=st['label'])
-            ax.fill_between(incs, means - cis, means + cis, color=st['color'], alpha=0.15)
-        ax.set_xticks(incs)
-        ax.set_xlabel("Inconsistency (%)")
-        ax.set_title(MET_LABEL[metric], fontsize=18, pad=8)
-        ax.grid(True)
-        ax.set_axisbelow(True)
-    handles, labels = axes[0].get_legend_handles_labels()
-    fig.legend(handles, labels, loc='upper center', bbox_to_anchor=(0.5, 1.0),
-               ncol=4, fontsize=16, frameon=True, columnspacing=2.0)
-    fig.tight_layout(rect=[0, 0, 1, 0.90])
-    fig.savefig(os.path.join(OUT, "fig_baselines_inc_v1.png"), dpi=DPI)
-    plt.close(fig)
-    print("Wrote paper_figs/fig_baselines_inc_v1.png")
+def fig_factors(results):
+    _fig_factors_group(
+        results, ['FTRL_DOR_ADJJ1', 'FTRLDIR_DOR_ADJJ1', 'DORLP_DOR_ADJJ1'],
+        "fig_factors_point_v1.png")
+    _fig_factors_group(
+        results, ['BAYES_DOR_ADJJ1', 'BAYESDIR_DOR_ADJJ1', 'SMAA_DOR_ADJJ1'],
+        "fig_factors_sampling_v1.png")
 
 
 # -------------------------------------------------------------- fig_logloss
@@ -340,7 +350,6 @@ def main():
     print(f"Configs: {len(results)}")
     fig_overall(results)
     fig_factors(results)
-    fig_baselines(results)
     fig_sets_tau()
     diagnostics(results)
     l1_check()
