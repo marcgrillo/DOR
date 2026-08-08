@@ -33,14 +33,17 @@ MET_LABEL = {'asrs': 'ASR', 'asps': 'ASP', 'aios': 'AIO'}
 T_LEVELS = [1, 3, 5, 10]
 DPI = 200
 
+# Okabe-Ito colour-blind-safe palette: blue / sky blue for the FTRL family,
+# orange / light orange for the BAYES family, bluish green and reddish purple
+# for the two competing baselines.
 STYLE = {
-    'FTRL_DOR_ADJJ1':  dict(color='#1f4fd8', ls='-',  marker='o', label='FTRL-DOR'),
-    'BAYES_DOR_ADJJ1': dict(color='#e8810c', ls='--', marker='s', label='BAYES-DOR'),
-    'SMAA_DOR_ADJJ1':  dict(color='#2e8b57', ls='-.', marker='^', label='SMAA-DOR'),
-    'DORLP_DOR_ADJJ1': dict(color='#777777', ls=':',  marker='D', label='DOR (LP)'),
-    'FTRLDIR_DOR_ADJJ1':  dict(color='#8fa9ec', ls='-',  marker='o',
+    'FTRL_DOR_ADJJ1':  dict(color='#0072B2', ls='-',  marker='o', label='FTRL-DOR'),
+    'BAYES_DOR_ADJJ1': dict(color='#E69F00', ls='--', marker='s', label='BAYES-DOR'),
+    'SMAA_DOR_ADJJ1':  dict(color='#009E73', ls='-.', marker='^', label='SMAA-DOR'),
+    'DORLP_DOR_ADJJ1': dict(color='#CC79A7', ls=':',  marker='D', label='DOR (LP)'),
+    'FTRLDIR_DOR_ADJJ1':  dict(color='#7FC4EC', ls='-',  marker='o',
                                label=r'FTRL$_{\mathrm{dir}}$'),
-    'BAYESDIR_DOR_ADJJ1': dict(color='#f4bc7d', ls='--', marker='s',
+    'BAYESDIR_DOR_ADJJ1': dict(color='#F3C673', ls='--', marker='s',
                                label=r'BAYES$_{\mathrm{dir}}$'),
 }
 ARMS_ALL = ['FTRL_DOR_ADJJ1', 'BAYES_DOR_ADJJ1', 'SMAA_DOR_ADJJ1',
