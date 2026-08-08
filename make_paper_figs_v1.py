@@ -30,7 +30,7 @@ import matplotlib.pyplot as plt
 NPZ = "grid_results_joint_v1.npz"
 OUT = "paper_figs"
 METRICS = ['asrs', 'asps', 'aios']
-MET_LABEL = {'asrs': 'ASR', 'asps': 'ASP', 'aios': 'AIOS'}
+MET_LABEL = {'asrs': 'ASR', 'asps': 'ASP', 'aios': 'AIO'}
 T_LEVELS = [1, 3, 5, 10]
 DPI = 200
 

@@ -81,7 +81,7 @@ def write_marginal_table(results, arms, col_names, caption, label, path):
         "\\begin{tabularx}{\\textwidth}{l|c|" + "C" * ncols + "}",
         "\\toprule",
         "\\multirow{2}{*}{Configuration}&&" + "&".join(
-            f"\\multicolumn{{{len(arms)}}}{{c}}{{{m}}}" for m in ['ASR', 'ASP', 'AIOS']) + "\\\\",
+            f"\\multicolumn{{{len(arms)}}}{{c}}{{{m}}}" for m in ['ASR', 'ASP', 'AIO']) + "\\\\",
     ]
     cml = []
     for i in range(len(METRICS)):
@@ -132,7 +132,7 @@ def write_overall_by_inc_table(results, arms, col_names, caption, label, path):
         "&$|F_{\\text{inc}}|$&" + "&".join(names) + "\\\\",
         "\\midrule",
     ]
-    for mi, (metric, mname) in enumerate(zip(METRICS, ['ASR', 'ASP', 'AIOS'])):
+    for mi, (metric, mname) in enumerate(zip(METRICS, ['ASR', 'ASP', 'AIO'])):
         if mi:
             lines.append("\\midrule")
         lines.append(f"\\multirow{{5}}{{*}}{{{mname}}}&all & " + " & ".join(
