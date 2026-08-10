@@ -4,9 +4,14 @@ individual judgements, measured on the whole generated grid.
 For each subset size k it reports
   - the mean true utility distance between ADJACENT displayed alternatives
     (order statistics get closer as the subset grows);
-  - the share of declared adjacent judgements carrying zero blank cards;
+  - the share of declared adjacent judgements carrying zero blank cards,
+    split by noise level;
   - the realized share of FLIPPED adjacent judgements (declared order
-    contradicting the true one), by noise level and pooled.
+    contradicting the true one), by noise level and pooled;
+  - AIO against k SEPARATELY at each noise level, which is the decisive
+    evidence: with a consistent DM the zero-card share still grows with k
+    yet AIO keeps improving, so the dip is caused by the flipped
+    judgements, not by the dilution of the intensity information.
 It also reports the flip share by |A| and by m, which is what the claim in
 Section~\ref{sec:sim_design} rests on.
 Run from the DOR folder.
@@ -15,9 +20,11 @@ import os
 from collections import defaultdict
 
 import numpy as np
+from scipy.stats import mannwhitneyu
 
 from common import utils
 from experiments.simulation import expand_subrank
+import make_paper_figs_v1 as m
 
 F1_LEVELS = [10, 20, 35, 50]
 F2_LEVELS = [3, 5, 7, 9]
@@ -31,6 +38,7 @@ def main():
     dU = defaultdict(list)                      # k -> adjacent |delta U|
     top_gap = defaultdict(list)                 # k -> U(best) - U(second)
     zero = defaultdict(lambda: [0, 0])          # k -> [eta==0, total]
+    zero_ki = defaultdict(lambda: [0, 0])       # (k, inc)
     flip_k = defaultdict(lambda: [0, 0])        # k -> [flipped, total] (inc>0)
     flip_ki = defaultdict(lambda: [0, 0])       # (k, inc)
     flip_a = defaultdict(lambda: [0, 0])        # |A| (inc>0)
@@ -63,6 +71,8 @@ def main():
                                 dU[k].append(abs(ui - uj))
                                 zero[k][0] += int(e == 0)
                                 zero[k][1] += 1
+                                zero_ki[(k, inc)][0] += int(e == 0)
+                                zero_ki[(k, inc)][1] += 1
                                 bad = int(ui < uj)
                                 flip_ki[(k, inc)][0] += bad
                                 flip_ki[(k, inc)][1] += 1
@@ -94,11 +104,36 @@ def main():
             row += f"{f / max(n, 1):>9.1%} "
         print(row)
 
+    print("\n=== zero-card share by k and nominal noise level ===")
+    print(f"    {'':>8}" + "".join(f"{'k=' + str(k):>10}" for k in K_LEVELS))
+    for inc in INC_LEVELS:
+        row = f"    inc={inc:<4}"
+        for k in K_LEVELS:
+            z, n = zero_ki[(k, inc)]
+            row += f"{z / max(n, 1):>9.1%} "
+        print(row)
+
     print("\n=== flipped share by |A| and by m (noisy levels, pooled over k) ===")
     print("  " + "  ".join(f"|A|={a}: {flip_a[a][0] / flip_a[a][1]:.1%}"
                            for a in F1_LEVELS))
     print("  " + "  ".join(f"m={b}: {flip_m[b][0] / flip_m[b][1]:.1%}"
                            for b in F2_LEVELS))
+
+    # ---- decisive test: AIO against k, separately at each noise level ------
+    print("\n=== AIO by k at each noise level (dip only where flips exist) ===")
+    res = np.load(m.NPZ, allow_pickle=True)['results'].item()
+    arms = [('FTRL_DOR_ADJJ1', 'FTRL'), ('BAYES_DOR_ADJJ1', 'BAYES'),
+            ('FTRLDIR_DOR_ADJJ1', 'FTRLd'), ('BAYESDIR_DOR_ADJJ1', 'BAYESd')]
+    for inc in INC_LEVELS:
+        print(f"  |F_inc| = {inc}%")
+        for arm, lbl in arms:
+            vals = [m.pool(res, arm, 'aios', K=k, Inc=inc) for k in K_LEVELS]
+            vals = [v[~np.isnan(v)] for v in vals]
+            means = [v.mean() for v in vals]
+            p = mannwhitneyu(vals[1], vals[2], alternative='two-sided').pvalue
+            tag = "monotone" if means[2] >= means[1] else "DIP at k=5"
+            print(f"    {lbl:<7} {means[0]:.3f} {means[1]:.3f} {means[2]:.3f}"
+                  f"   k4->k5 {means[2] - means[1]:+.3f} (p={p:.3f})  {tag}")
 
 
 if __name__ == "__main__":
