@@ -26,11 +26,10 @@ HEADER_BASE = r"FTRL&BAYES&SMAA&LP"
 METS = [('asrs', 'ASR'), ('asps', 'ASP'), ('aios', 'AIO')]
 
 # Per-level one-sided paired Wilcoxon tests appended to each factor table.
-# B-DOR tables: the pairs adjacent in the overall performance ordering, so
-# that all the gaps of the chain are tested at every factor level.
+# B-DOR tables: within-family only -- each estimator against its own
+# direction-only version (the per-level value of the card counts).
 TESTS_BDOR = [
     ('FTRL_DOR_ADJJ1', 'FTRLDIR_DOR_ADJJ1', r"$p_{\mathrm{F>F_d}}$"),
-    ('FTRLDIR_DOR_ADJJ1', 'BAYES_DOR_ADJJ1', r"$p_{\mathrm{F_d>B}}$"),
     ('BAYES_DOR_ADJJ1', 'BAYESDIR_DOR_ADJJ1', r"$p_{\mathrm{B>B_d}}$"),
 ]
 # T=1 tables: each proposed estimator against each existing method.
@@ -42,13 +41,12 @@ TESTS_BASE = [
 ]
 
 NOTE_BDOR = (
-    r" The last three columns report the $p$-values of one-sided paired "
-    r"Wilcoxon signed-rank tests between the algorithms that are adjacent "
-    r"in the overall performance ordering, at that factor level "
+    r" The last two columns report the $p$-values of one-sided paired "
+    r"Wilcoxon signed-rank tests of each estimator against its own "
+    r"direction-only version, at that factor level "
     r"(F $=$ FTRL-DOR, F$_{\mathrm{d}}$ $=$ FTRL$_{\text{dir}}$, B $=$ "
     r"BAYES-DOR, B$_{\mathrm{d}}$ $=$ BAYES$_{\text{dir}}$); pairing as in "
-    r"Table~\ref{tab:overall_summary}, values close to $1$ indicate that "
-    r"the second algorithm is ahead.")
+    r"Table~\ref{tab:overall_summary}.")
 NOTE_BASE = (
     r" The last four columns report the $p$-values of one-sided paired "
     r"Wilcoxon signed-rank tests of each proposed estimator against each "
