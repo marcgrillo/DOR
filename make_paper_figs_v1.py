@@ -49,6 +49,12 @@ STYLE = {
 ARMS_ALL = ['FTRL_DOR_ADJJ1', 'BAYES_DOR_ADJJ1', 'SMAA_DOR_ADJJ1',
             'DORLP_DOR_ADJJ1', 'FTRLDIR_DOR_ADJJ1', 'BAYESDIR_DOR_ADJJ1']
 DIR_ARMS = {'FTRLDIR_DOR_ADJJ1', 'BAYESDIR_DOR_ADJJ1'}
+# The paper's two comparisons: the four B-DOR arms over the full grid, and the
+# proposed estimators against the (one-shot) existing DOR methods at T = 1.
+ARMS_BDOR = ['FTRL_DOR_ADJJ1', 'BAYES_DOR_ADJJ1',
+             'FTRLDIR_DOR_ADJJ1', 'BAYESDIR_DOR_ADJJ1']
+ARMS_BASELINES = ['FTRL_DOR_ADJJ1', 'BAYES_DOR_ADJJ1',
+                  'SMAA_DOR_ADJJ1', 'DORLP_DOR_ADJJ1']
 
 plt.rcParams.update({
     'font.size': 15,
@@ -92,14 +98,16 @@ def mean_ci(v):
 
 
 # ---------------------------------------------------------------- fig_overall
-def fig_overall(results):
+def fig_overall(results, arms=None):
     """One panel per metric, each with its own vertical scale and the methods
     sorted from best to worst, so differences stay visible on every metric."""
     from matplotlib.patches import Patch
+    if arms is None:
+        arms = ARMS_BDOR
     fig, axes = plt.subplots(1, len(METRICS), figsize=(16.5, 5.8))
     for ax, met in zip(axes, METRICS):
-        stats = {arm: mean_ci(pool(results, arm, met)) for arm in ARMS_ALL}
-        order = sorted(ARMS_ALL, key=lambda a: -stats[a][0])
+        stats = {arm: mean_ci(pool(results, arm, met)) for arm in arms}
+        order = sorted(arms, key=lambda a: -stats[a][0])
         means = np.array([stats[a][0] for a in order])
         cis = np.array([stats[a][1] for a in order])
         xs = np.arange(len(order))
@@ -120,9 +128,9 @@ def fig_overall(results):
         ax.set_axisbelow(True)
     axes[0].set_ylabel("Mean metric value", fontsize=18)
     handles = [Patch(facecolor=STYLE[a]['color'], label=STYLE[a]['label'])
-               for a in ARMS_ALL]
+               for a in arms]
     fig.legend(handles=handles, loc='upper center', bbox_to_anchor=(0.5, 1.0),
-               ncol=6, fontsize=16, frameon=True, columnspacing=1.3)
+               ncol=len(arms), fontsize=16, frameon=True, columnspacing=1.3)
     fig.tight_layout(rect=[0, 0, 1, 0.89])
     fig.savefig(os.path.join(OUT, "fig_overall_v1.png"), dpi=DPI)
     plt.close(fig)
@@ -130,18 +138,23 @@ def fig_overall(results):
 
 
 # ---------------------------------------------------------------- fig_factors
-def _fig_factors_group(results, arms, fname):
+def _fig_factors_group(results, arms, fname, T_fix=None):
     """Factors as rows, metrics as columns (portrait layout); grouped bars
-    sorted best-to-worst within each level group; per-panel vertical scale."""
+    sorted best-to-worst within each level group; per-panel vertical scale.
+    With T_fix, every panel is restricted to that horizon and the T row is
+    dropped (used for the one-shot baseline comparison at T = 1)."""
     from matplotlib.patches import Patch
     factors = [('F1', [10, 20, 35, 50], "Number of\nalternatives $|A|$"),
                ('F2', [3, 5, 7, 9], "Number of\ncriteria $m$"),
                ('T', T_LEVELS, "Elicitation\nsteps $T$"),
                ('K', [3, 4, 5], "Subset size $k$"),
                ('Inc', [0, 15, 35, 50], "Inconsistency (%)")]
-    fig, axes = plt.subplots(len(factors), len(METRICS), figsize=(13.5, 15.5))
+    if T_fix is not None:
+        factors = [f for f in factors if f[0] != 'T']
+    fig, axes = plt.subplots(len(factors), len(METRICS),
+                             figsize=(13.5, 3.1 * len(factors)))
     n_arms = len(arms)
-    bw = 0.24
+    bw = min(0.24, 0.82 / n_arms)
     offs = (np.arange(n_arms) - (n_arms - 1) / 2) * bw
     for r, (fac, levels, title) in enumerate(factors):
         for c, metric in enumerate(METRICS):
@@ -150,6 +163,8 @@ def _fig_factors_group(results, arms, fname):
             lo, hi = np.inf, -np.inf
             for j, lv in enumerate(levels):
                 filt = dict(T=lv) if fac == 'T' else {fac: lv}
+                if T_fix is not None:
+                    filt['T'] = T_fix
                 stats = {arm: mean_ci(pool(results, arm, metric, **filt))
                          for arm in arms}
                 # within each level group, bars sorted from best to worst
@@ -175,20 +190,20 @@ def _fig_factors_group(results, arms, fname):
     handles = [Patch(facecolor=STYLE[a]['color'], label=STYLE[a]['label'])
                for a in arms]
     fig.legend(handles=handles, loc='upper center', bbox_to_anchor=(0.5, 1.0),
-               ncol=3, fontsize=18, frameon=True, columnspacing=2.0)
-    fig.tight_layout(rect=[0, 0, 1, 0.96])
+               ncol=min(4, n_arms), fontsize=18, frameon=True, columnspacing=2.0)
+    top = 1.0 - 0.62 / (3.1 * len(factors))
+    fig.tight_layout(rect=[0, 0, 1, top])
     fig.savefig(os.path.join(OUT, fname), dpi=DPI)
     plt.close(fig)
     print(f"Wrote paper_figs/{fname}")
 
 
 def fig_factors(results):
-    _fig_factors_group(
-        results, ['FTRL_DOR_ADJJ1', 'FTRLDIR_DOR_ADJJ1', 'DORLP_DOR_ADJJ1'],
-        "fig_factors_point_v1.png")
-    _fig_factors_group(
-        results, ['BAYES_DOR_ADJJ1', 'BAYESDIR_DOR_ADJJ1', 'SMAA_DOR_ADJJ1'],
-        "fig_factors_sampling_v1.png")
+    # single figure with the four B-DOR arms over the full grid
+    _fig_factors_group(results, ARMS_BDOR, "fig_factors_bdor_v1.png")
+    # proposed estimators vs the one-shot existing DOR methods, at T = 1 only
+    _fig_factors_group(results, ARMS_BASELINES, "fig_baselines_t1_v1.png",
+                       T_fix=1)
 
 
 # -------------------------------------------------------------- fig_logloss
