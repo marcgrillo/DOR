@@ -6,9 +6,16 @@ Three views:
   1. full (T, k) cross-tab of each metric, per arm, with n_T annotated;
   2. the equal-n test: (T=5, k=5) vs (T=10, k=3), both n_T = 20;
   3. growth per doubling of n_T measured separately along T and along k.
+
+NOTE on (2): configurations that differ in k are generated from different
+decision problems (verified: the evaluation matrices of the K=3 and K=5
+datasets differ), so the two designs are NOT paired and the equal-n
+comparison uses a two-sided Mann-Whitney test, unlike the paired
+signed-rank tests used for same-data comparisons elsewhere.
 Run from the DOR folder.
 """
 import numpy as np
+from scipy.stats import mannwhitneyu
 
 import make_paper_figs_v1 as m
 
@@ -36,16 +43,19 @@ def main():
                     row += f"{mean:.3f}+-{ci:.3f} (n={T * (k - 1):>2}) ".rjust(22)
                 print(row)
 
-    print(f"\n{'=' * 78}\nEQUAL-n TEST: (T=5,k=5) vs (T=10,k=3), "
-          f"both n_T=20\n{'=' * 78}")
+    print(f"\n{'=' * 78}\nEQUAL-n TEST: (T=5,k=5) vs (T=10,k=3), both n_T=20"
+          f"\n(unpaired: the two designs use different decision problems)"
+          f"\n{'=' * 78}")
     for metric, mname in METS:
         print(f"\n  {mname}")
         for arm, label in ARMS:
-            a, ca = m.mean_ci(m.pool(res, arm, metric, T=5, K=5))
-            b, cb = m.mean_ci(m.pool(res, arm, metric, T=10, K=3))
-            sep = "OVERLAP" if abs(a - b) < (ca + cb) else "DIFFER "
-            print(f"    {label:<7} T=5,k=5: {a:.3f}+-{ca:.3f}   "
-                  f"T=10,k=3: {b:.3f}+-{cb:.3f}   diff={b - a:+.3f}  {sep}")
+            x = m.pool(res, arm, metric, T=5, K=5)
+            y = m.pool(res, arm, metric, T=10, K=3)
+            x, y = x[~np.isnan(x)], y[~np.isnan(y)]
+            p = mannwhitneyu(x, y, alternative='two-sided').pvalue
+            print(f"    {label:<7} T=5,k=5: {x.mean():.3f}   "
+                  f"T=10,k=3: {y.mean():.3f}   diff={y.mean() - x.mean():+.3f}"
+                  f"   Mann-Whitney p={p:.3f}")
 
     print(f"\n{'=' * 78}\nGROWTH PER DOUBLING OF n_T, along each factor "
           f"(marginal means)\n{'=' * 78}")
