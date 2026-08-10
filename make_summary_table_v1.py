@@ -30,10 +30,10 @@ UPPER_TESTS = [('FTRL_DOR_ADJJ1', 'FTRLDIR_DOR_ADJJ1'),
                ('BAYES_DOR_ADJJ1', 'BAYESDIR_DOR_ADJJ1')]
 LOWER_ARMS = ['FTRL_DOR_ADJJ1', 'BAYES_DOR_ADJJ1',
               'SMAA_DOR_ADJJ1', 'DORLP_DOR_ADJJ1']
-LOWER_TESTS = [('FTRL_DOR_ADJJ1', 'SMAA_DOR_ADJJ1'),
-               ('FTRL_DOR_ADJJ1', 'DORLP_DOR_ADJJ1'),
-               ('BAYES_DOR_ADJJ1', 'SMAA_DOR_ADJJ1'),
-               ('BAYES_DOR_ADJJ1', 'DORLP_DOR_ADJJ1')]
+# like-for-like: the point estimator against the LP, the sampling-based
+# estimator against SMAA-DOR
+LOWER_TESTS = [('FTRL_DOR_ADJJ1', 'DORLP_DOR_ADJJ1'),
+               ('BAYES_DOR_ADJJ1', 'SMAA_DOR_ADJJ1')]
 
 CAPTION = (
     r"Summary of the two comparisons. Upper block: mean of each metric over "
@@ -47,8 +47,10 @@ CAPTION = (
     r"the $p$-value of a one-sided paired Wilcoxon signed-rank test of the "
     r"hypothesis that the first method scores higher than the second, "
     r"paired on the same simulated decision problems and restricted to the "
-    r"replications shared by the two methods; values close to $1$ indicate "
-    r"that the second method is ahead.")
+    r"replications shared by the two methods; in the lower block, each "
+    r"proposed estimator is compared with the existing method of the same "
+    r"type (the point estimator FTRL-DOR with the LP, the sampling-based "
+    r"BAYES-DOR with SMAA-DOR).")
 
 
 def paired(results, arm_a, arm_b, metric, T=None):

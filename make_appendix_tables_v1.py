@@ -32,12 +32,11 @@ TESTS_BDOR = [
     ('FTRL_DOR_ADJJ1', 'FTRLDIR_DOR_ADJJ1', r"$p_{\mathrm{F>F_d}}$"),
     ('BAYES_DOR_ADJJ1', 'BAYESDIR_DOR_ADJJ1', r"$p_{\mathrm{B>B_d}}$"),
 ]
-# T=1 tables: each proposed estimator against each existing method.
+# T=1 tables: each proposed estimator against the existing method of the same
+# type -- point estimator vs the LP, sampling-based vs SMAA-DOR.
 TESTS_BASE = [
-    ('FTRL_DOR_ADJJ1', 'SMAA_DOR_ADJJ1', r"$p_{\mathrm{F>S}}$"),
     ('FTRL_DOR_ADJJ1', 'DORLP_DOR_ADJJ1', r"$p_{\mathrm{F>L}}$"),
     ('BAYES_DOR_ADJJ1', 'SMAA_DOR_ADJJ1', r"$p_{\mathrm{B>S}}$"),
-    ('BAYES_DOR_ADJJ1', 'DORLP_DOR_ADJJ1', r"$p_{\mathrm{B>L}}$"),
 ]
 
 NOTE_BDOR = (
@@ -48,10 +47,12 @@ NOTE_BDOR = (
     r"BAYES-DOR, B$_{\mathrm{d}}$ $=$ BAYES$_{\text{dir}}$); pairing as in "
     r"Table~\ref{tab:overall_summary}.")
 NOTE_BASE = (
-    r" The last four columns report the $p$-values of one-sided paired "
-    r"Wilcoxon signed-rank tests of each proposed estimator against each "
-    r"existing method, at that factor level (F $=$ FTRL-DOR, B $=$ "
-    r"BAYES-DOR, S $=$ SMAA-DOR, L $=$ LP); pairing as in "
+    r" The last two columns report the $p$-values of one-sided paired "
+    r"Wilcoxon signed-rank tests of each proposed estimator against the "
+    r"existing method of the same type --- the point estimator FTRL-DOR "
+    r"against the linear programme, the sampling-based BAYES-DOR against "
+    r"SMAA-DOR --- at that factor level (F $=$ FTRL-DOR, B $=$ BAYES-DOR, "
+    r"S $=$ SMAA-DOR, L $=$ LP); pairing as in "
     r"Table~\ref{tab:overall_summary}, values close to $1$ indicate that "
     r"the existing method is ahead.")
 
