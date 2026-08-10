@@ -38,8 +38,8 @@ LOWER_TESTS = [('FTRL_DOR_ADJJ1', 'SMAA_DOR_ADJJ1'),
 CAPTION = (
     r"Summary of the two comparisons. Upper block: mean of each metric over "
     r"the whole simulation grid, with $95\%$ confidence intervals, for the "
-    r"four B-DOR arms (subscript dir: card counts ignored); the FTRL arms "
-    r"use $20$ replications per grid cell, the Bayesian arms $5$. Lower "
+    r"four B-DOR algorithms (subscript dir: card counts ignored); the FTRL "
+    r"algorithms use $20$ replications per grid cell, the Bayesian ones $5$. Lower "
     r"block: the same means after the first elicitation session only "
     r"($T=1$), for the proposed estimators and the existing DOR methods, "
     r"SMAA-DOR \citep{corrente2025deck} and the original DOR linear "
