@@ -1,0 +1,28 @@
+\begin{table}[htp]
+    \centering
+    \caption{Summary of the two comparisons. Upper block: mean of each metric over the whole simulation grid, with $95\%$ confidence intervals, for the four B-DOR arms (subscript dir: card counts ignored); the FTRL arms use $20$ replications per grid cell, the Bayesian arms $5$. Lower block: the same means after the first elicitation session only ($T=1$), for the proposed estimators and the existing DOR methods, SMAA-DOR \citep{corrente2025deck} and the original DOR linear programme \citep[LP,][]{barbati2024deck}. Each Wilcoxon row reports the $p$-value of a one-sided paired Wilcoxon signed-rank test of the hypothesis that the first method scores higher than the second, paired on the same simulated decision problems and restricted to the replications shared by the two methods; values close to $1$ indicate that the second method is ahead.}
+    \label{tab:overall_summary}
+\begin{tabularx}{\textwidth}{l|CCC}
+\toprule
+&ASR&ASP&AIO\\
+\midrule
+\multicolumn{4}{l}{\itshape Whole grid, all horizons (Section~\ref{sec:sim_results})}\\[2pt]
+FTRL-DOR & $0.212{\scriptstyle\pm0.003}$ & $0.846{\scriptstyle\pm0.001}$ & $0.502{\scriptstyle\pm0.008}$ \\
+FTRL$_{\text{dir}}$ & $0.189{\scriptstyle\pm0.003}$ & $0.835{\scriptstyle\pm0.001}$ & $0.469{\scriptstyle\pm0.008}$ \\
+BAYES-DOR & $0.175{\scriptstyle\pm0.004}$ & $0.805{\scriptstyle\pm0.002}$ & $0.439{\scriptstyle\pm0.011}$ \\
+BAYES$_{\text{dir}}$ & $0.159{\scriptstyle\pm0.004}$ & $0.793{\scriptstyle\pm0.002}$ & $0.412{\scriptstyle\pm0.010}$ \\
+\quad FTRL-DOR $>$ FTRL$_{\text{dir}}$ (Wilcoxon $p$) & $<0.001$ & $<0.001$ & $<0.001$ \\
+\quad BAYES-DOR $>$ BAYES$_{\text{dir}}$ (Wilcoxon $p$) & $<0.001$ & $<0.001$ & $<0.001$ \\
+\midrule
+\multicolumn{4}{l}{\itshape First session only ($T=1$), proposed vs existing methods (Section~\ref{sec:sim_baselines})}\\[2pt]
+FTRL-DOR & $0.145{\scriptstyle\pm0.004}$ & $0.792{\scriptstyle\pm0.002}$ & $0.404{\scriptstyle\pm0.016}$ \\
+BAYES-DOR & $0.124{\scriptstyle\pm0.006}$ & $0.747{\scriptstyle\pm0.004}$ & $0.341{\scriptstyle\pm0.020}$ \\
+SMAA-DOR & $0.114{\scriptstyle\pm0.008}$ & $0.707{\scriptstyle\pm0.007}$ & $0.280{\scriptstyle\pm0.026}$ \\
+DOR (LP) & $0.107{\scriptstyle\pm0.004}$ & $0.773{\scriptstyle\pm0.004}$ & $0.227{\scriptstyle\pm0.013}$ \\
+\quad FTRL-DOR $>$ SMAA-DOR (Wilcoxon $p$) & $<0.001$ & $<0.001$ & $<0.001$ \\
+\quad FTRL-DOR $>$ DOR (LP) (Wilcoxon $p$) & $<0.001$ & $<0.001$ & $<0.001$ \\
+\quad BAYES-DOR $>$ SMAA-DOR (Wilcoxon $p$) & $<0.001$ & $<0.001$ & $<0.001$ \\
+\quad BAYES-DOR $>$ DOR (LP) (Wilcoxon $p$) & $<0.001$ & $>0.999$ & $<0.001$ \\
+\bottomrule
+\end{tabularx}
+\end{table}

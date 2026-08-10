@@ -97,44 +97,8 @@ def mean_ci(v):
     return v.mean(), 1.96 * v.std() / np.sqrt(len(v))
 
 
-# ---------------------------------------------------------------- fig_overall
-def fig_overall(results, arms=None):
-    """One panel per metric, each with its own vertical scale and the methods
-    sorted from best to worst, so differences stay visible on every metric."""
-    from matplotlib.patches import Patch
-    if arms is None:
-        arms = ARMS_BDOR
-    fig, axes = plt.subplots(1, len(METRICS), figsize=(16.5, 5.8))
-    for ax, met in zip(axes, METRICS):
-        stats = {arm: mean_ci(pool(results, arm, met)) for arm in arms}
-        order = sorted(arms, key=lambda a: -stats[a][0])
-        means = np.array([stats[a][0] for a in order])
-        cis = np.array([stats[a][1] for a in order])
-        xs = np.arange(len(order))
-        ax.bar(xs, means, width=0.72, yerr=cis, capsize=4,
-               color=[STYLE[a]['color'] for a in order],
-               error_kw=dict(lw=1.6, capthick=1.6))
-        lo = float(np.min(means - cis))
-        hi = float(np.max(means + cis))
-        pad = 0.18 * (hi - lo)
-        ax.set_ylim(max(0.0, lo - 1.2 * pad), hi + 2.6 * pad)
-        for x, v, c, a in zip(xs, means, cis, order):
-            ax.text(x, v + c + 0.3 * pad, f"{v:.3f}", ha='center', fontsize=14,
-                    fontweight='bold', color=STYLE[a]['color'])
-        ax.set_xticks([])
-        ax.tick_params(axis='y', labelsize=15)
-        ax.set_title(MET_LABEL[met], fontsize=20, pad=8)
-        ax.grid(axis='y')
-        ax.set_axisbelow(True)
-    axes[0].set_ylabel("Mean metric value", fontsize=18)
-    handles = [Patch(facecolor=STYLE[a]['color'], label=STYLE[a]['label'])
-               for a in arms]
-    fig.legend(handles=handles, loc='upper center', bbox_to_anchor=(0.5, 1.0),
-               ncol=len(arms), fontsize=16, frameon=True, columnspacing=1.3)
-    fig.tight_layout(rect=[0, 0, 1, 0.89])
-    fig.savefig(os.path.join(OUT, "fig_overall_v1.png"), dpi=DPI)
-    plt.close(fig)
-    print("Wrote paper_figs/fig_overall_v1.png")
+# The former fig_overall bar chart is replaced in the paper by the summary
+# table with Wilcoxon tests (make_summary_table_v1.py, tab:overall_summary).
 
 
 # ---------------------------------------------------------------- fig_factors
@@ -366,7 +330,6 @@ def main():
     os.makedirs(OUT, exist_ok=True)
     results = np.load(NPZ, allow_pickle=True)['results'].item()
     print(f"Configs: {len(results)}")
-    fig_overall(results)
     fig_factors(results)
     fig_sets_tau()
     diagnostics(results)
