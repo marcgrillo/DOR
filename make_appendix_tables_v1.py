@@ -22,7 +22,7 @@ ARMS_BDOR = ['FTRL_DOR_ADJJ1', 'BAYES_DOR_ADJJ1',
 HEADER_BDOR = r"FTRL&BAYES&FTRL$_{\text{dir}}$&BAYES$_{\text{dir}}$"
 ARMS_BASE = ['FTRL_DOR_ADJJ1', 'BAYES_DOR_ADJJ1',
              'SMAA_DOR_ADJJ1', 'DORLP_DOR_ADJJ1']
-HEADER_BASE = r"FTRL&BAYES&SMAA&LP"
+HEADER_BASE = r"FTRL&BAYES&SMAA&DOR"
 METS = [('asrs', 'ASR'), ('asps', 'ASP'), ('aios', 'AIO')]
 
 # Per-level one-sided paired Wilcoxon tests appended to each factor table.
@@ -35,7 +35,7 @@ TESTS_BDOR = [
 # T=1 tables: each proposed estimator against the existing method of the same
 # type -- point estimator vs the LP, sampling-based vs SMAA-DOR.
 TESTS_BASE = [
-    ('FTRL_DOR_ADJJ1', 'DORLP_DOR_ADJJ1', r"$p_{\mathrm{F>L}}$"),
+    ('FTRL_DOR_ADJJ1', 'DORLP_DOR_ADJJ1', r"$p_{\mathrm{F>D}}$"),
     ('BAYES_DOR_ADJJ1', 'SMAA_DOR_ADJJ1', r"$p_{\mathrm{B>S}}$"),
 ]
 
@@ -50,9 +50,9 @@ NOTE_BASE = (
     r" The last two columns report the $p$-values of one-sided paired "
     r"Wilcoxon signed-rank tests of each proposed estimator against the "
     r"existing method of the same type --- the point estimator FTRL-DOR "
-    r"against the linear programme, the sampling-based BAYES-DOR against "
+    r"against DOR, the sampling-based BAYES-DOR against "
     r"SMAA-DOR --- at that factor level (F $=$ FTRL-DOR, B $=$ BAYES-DOR, "
-    r"S $=$ SMAA-DOR, L $=$ LP); pairing as in "
+    r"S $=$ SMAA-DOR, D $=$ DOR); pairing as in "
     r"Table~\ref{tab:overall_summary}, values close to $1$ indicate that "
     r"the existing method is ahead.")
 

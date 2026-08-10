@@ -1,6 +1,6 @@
 \begin{table}[htp]
     \centering
-    \caption{Summary of the two comparisons. Upper block: mean of each metric over the whole simulation grid, with $95\%$ confidence intervals, for the four B-DOR algorithms (subscript dir: card counts ignored); the FTRL algorithms use $20$ replications per grid cell, the Bayesian ones $5$. Lower block: the same means after the first elicitation session only ($T=1$), for the proposed estimators and the existing DOR methods, SMAA-DOR \citep{corrente2025deck} and the original DOR linear programme \citep[LP,][]{barbati2024deck}. Each Wilcoxon row reports the $p$-value of a one-sided paired Wilcoxon signed-rank test of the hypothesis that the first method scores higher than the second, paired on the same simulated decision problems and restricted to the replications shared by the two methods; in the lower block, each proposed estimator is compared with the existing method of the same type (the point estimator FTRL-DOR with the LP, the sampling-based BAYES-DOR with SMAA-DOR).}
+    \caption{Summary of the two comparisons. Upper block: mean of each metric over the whole simulation grid, with $95\%$ confidence intervals, for the four B-DOR algorithms (subscript dir: card counts ignored); the FTRL algorithms use $20$ replications per grid cell, the Bayesian ones $5$. Lower block: the same means after the first elicitation session only ($T=1$), for the proposed estimators and the existing DOR methods, SMAA-DOR \citep{corrente2025deck} and the original DOR method \citep{barbati2024deck}. Each Wilcoxon row reports the $p$-value of a one-sided paired Wilcoxon signed-rank test of the hypothesis that the first method scores higher than the second, paired on the same simulated decision problems and restricted to the replications shared by the two methods; in the lower block, each proposed estimator is compared with the existing method of the same type (the point estimator FTRL-DOR with DOR, the sampling-based BAYES-DOR with SMAA-DOR).}
     \label{tab:overall_summary}
 \begin{tabularx}{\textwidth}{l|CCC}
 \toprule
@@ -18,8 +18,8 @@ BAYES$_{\text{dir}}$ & $0.159{\scriptstyle\pm0.004}$ & $0.793{\scriptstyle\pm0.0
 FTRL-DOR & $0.145{\scriptstyle\pm0.004}$ & $0.792{\scriptstyle\pm0.002}$ & $0.404{\scriptstyle\pm0.016}$ \\
 BAYES-DOR & $0.124{\scriptstyle\pm0.006}$ & $0.747{\scriptstyle\pm0.004}$ & $0.341{\scriptstyle\pm0.020}$ \\
 SMAA-DOR & $0.114{\scriptstyle\pm0.008}$ & $0.707{\scriptstyle\pm0.007}$ & $0.280{\scriptstyle\pm0.026}$ \\
-DOR (LP) & $0.107{\scriptstyle\pm0.004}$ & $0.773{\scriptstyle\pm0.004}$ & $0.227{\scriptstyle\pm0.013}$ \\
-\quad FTRL-DOR $>$ DOR (LP) (Wilcoxon $p$) & $<0.001$ & $<0.001$ & $<0.001$ \\
+DOR & $0.107{\scriptstyle\pm0.004}$ & $0.773{\scriptstyle\pm0.004}$ & $0.227{\scriptstyle\pm0.013}$ \\
+\quad FTRL-DOR $>$ DOR (Wilcoxon $p$) & $<0.001$ & $<0.001$ & $<0.001$ \\
 \quad BAYES-DOR $>$ SMAA-DOR (Wilcoxon $p$) & $<0.001$ & $<0.001$ & $<0.001$ \\
 \bottomrule
 \end{tabularx}

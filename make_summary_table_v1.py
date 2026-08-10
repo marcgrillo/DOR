@@ -18,7 +18,7 @@ LBL = {
     'FTRL_DOR_ADJJ1': 'FTRL-DOR',
     'BAYES_DOR_ADJJ1': 'BAYES-DOR',
     'SMAA_DOR_ADJJ1': 'SMAA-DOR',
-    'DORLP_DOR_ADJJ1': 'DOR (LP)',
+    'DORLP_DOR_ADJJ1': 'DOR',
     'FTRLDIR_DOR_ADJJ1': r'FTRL$_{\text{dir}}$',
     'BAYESDIR_DOR_ADJJ1': r'BAYES$_{\text{dir}}$',
 }
@@ -30,7 +30,7 @@ UPPER_TESTS = [('FTRL_DOR_ADJJ1', 'FTRLDIR_DOR_ADJJ1'),
                ('BAYES_DOR_ADJJ1', 'BAYESDIR_DOR_ADJJ1')]
 LOWER_ARMS = ['FTRL_DOR_ADJJ1', 'BAYES_DOR_ADJJ1',
               'SMAA_DOR_ADJJ1', 'DORLP_DOR_ADJJ1']
-# like-for-like: the point estimator against the LP, the sampling-based
+# like-for-like: the point estimator against DOR, the sampling-based
 # estimator against SMAA-DOR
 LOWER_TESTS = [('FTRL_DOR_ADJJ1', 'DORLP_DOR_ADJJ1'),
                ('BAYES_DOR_ADJJ1', 'SMAA_DOR_ADJJ1')]
@@ -42,14 +42,14 @@ CAPTION = (
     r"algorithms use $20$ replications per grid cell, the Bayesian ones $5$. Lower "
     r"block: the same means after the first elicitation session only "
     r"($T=1$), for the proposed estimators and the existing DOR methods, "
-    r"SMAA-DOR \citep{corrente2025deck} and the original DOR linear "
-    r"programme \citep[LP,][]{barbati2024deck}. Each Wilcoxon row reports "
+    r"SMAA-DOR \citep{corrente2025deck} and the original DOR method "
+    r"\citep{barbati2024deck}. Each Wilcoxon row reports "
     r"the $p$-value of a one-sided paired Wilcoxon signed-rank test of the "
     r"hypothesis that the first method scores higher than the second, "
     r"paired on the same simulated decision problems and restricted to the "
     r"replications shared by the two methods; in the lower block, each "
     r"proposed estimator is compared with the existing method of the same "
-    r"type (the point estimator FTRL-DOR with the LP, the sampling-based "
+    r"type (the point estimator FTRL-DOR with DOR, the sampling-based "
     r"BAYES-DOR with SMAA-DOR).")
 
 

@@ -40,7 +40,7 @@ STYLE = {
     'FTRL_DOR_ADJJ1':  dict(color='#0072B2', ls='-',  marker='o', label='FTRL-DOR'),
     'BAYES_DOR_ADJJ1': dict(color='#E69F00', ls='--', marker='s', label='BAYES-DOR'),
     'SMAA_DOR_ADJJ1':  dict(color='#009E73', ls='-.', marker='^', label='SMAA-DOR'),
-    'DORLP_DOR_ADJJ1': dict(color='#CC79A7', ls=':',  marker='D', label='DOR (LP)'),
+    'DORLP_DOR_ADJJ1': dict(color='#CC79A7', ls=':',  marker='D', label='DOR'),
     'FTRLDIR_DOR_ADJJ1':  dict(color='#7FC4EC', ls='-',  marker='o',
                                label=r'FTRL$_{\mathrm{dir}}$'),
     'BAYESDIR_DOR_ADJJ1': dict(color='#F3C673', ls='--', marker='s',
