@@ -57,6 +57,24 @@ def main():
                   f"T=10,k=3: {y.mean():.3f}   diff={y.mean() - x.mean():+.3f}"
                   f"   Mann-Whitney p={p:.3f}")
 
+    # The equal-n AIO advantage of the more-sessions design exists only under
+    # noise: with a consistent DM the two designs are equivalent. Same
+    # mechanism as the k=5 AIO dip (see analyze_subset_density_v1.py) --
+    # larger subsets ask for finer comparisons, which a noisy DM reverses
+    # more often -- and not a coverage effect, which would not vanish at 0%.
+    print(f"\n{'=' * 78}\nEQUAL-n BY NOISE LEVEL: (T=5,k=5) vs (T=10,k=3), "
+          f"AIO\n{'=' * 78}")
+    for inc in (0, 15, 35, 50):
+        print(f"  |F_inc| = {inc}%")
+        for arm, label in ARMS:
+            x = m.pool(res, arm, 'aios', T=5, K=5, Inc=inc)
+            y = m.pool(res, arm, 'aios', T=10, K=3, Inc=inc)
+            x, y = x[~np.isnan(x)], y[~np.isnan(y)]
+            p = mannwhitneyu(x, y, alternative='two-sided').pvalue
+            print(f"    {label:<7} T=5,k=5: {x.mean():.3f}   "
+                  f"T=10,k=3: {y.mean():.3f}   diff={y.mean() - x.mean():+.3f}"
+                  f"   p={p:.3f}")
+
     print(f"\n{'=' * 78}\nGROWTH PER DOUBLING OF n_T, along each factor "
           f"(marginal means)\n{'=' * 78}")
     for metric, mname in METS:
