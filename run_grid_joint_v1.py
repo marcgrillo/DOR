@@ -70,16 +70,27 @@ SAVE_PATH = "grid_results_joint_v1_tiny.npz" if TEST_MODE else "grid_results_joi
 #   SMAA  = SMAA-DOR baseline (corrente2025deck), Hit-and-Run samples
 #   DORLP = original DOR LP point estimate (barbati2024deck), fbnote 884-i
 #   *DIR  = direction-only ablation (card counts ignored), fbnote 884-ii
+# 2026-08-10: BAYES_DOR_ADJJ1 and SMAA_DOR_ADJJ1 promoted to all 20 tables. They
+# are the two arms of the T=1 comparison of Section 6.3 and were the only ones
+# still on hm_0/4 = 5 of the 20 decision problems each dataset already contains,
+# which is what made their confidence intervals twice as wide as FTRL's/DOR's.
+# Tables 0-4 are untouched (per-table seeds are seed_base + 100003*table_index+j
+# and overwrite=False skips existing sample files), so no existing number moves.
 ARMS = [
     ('FTRL_DOR_ADJJ1', 'adjacent', True),
-    ('BAYES_DOR_ADJJ1', 'adjacent', False),
+    ('BAYES_DOR_ADJJ1', 'adjacent', True),
     ('FTRL_DOR_ALLJ1', 'all', True),
     ('BAYES_DOR_ALLJ1', 'all', False),
-    ('SMAA_DOR_ADJJ1', 'adjacent', False),
+    ('SMAA_DOR_ADJJ1', 'adjacent', True),
     ('DORLP_DOR_ADJJ1', 'adjacent', True),
     ('FTRLDIR_DOR_ADJJ1', 'adjacent', True),
     ('BAYESDIR_DOR_ADJJ1', 'adjacent', False),
 ]
+
+# Arms re-run even when the npz already holds a result for them, needed when an
+# arm's table count grows: the resume check below is by arm presence, not by
+# replication count. Set to an empty set once the extra tables are in the npz.
+FORCE_ARMS = {'BAYES_DOR_ADJJ1', 'SMAA_DOR_ADJJ1'}
 
 
 def config_seed_base(f1, f2, a_r, k, f_inc, arm_idx):
@@ -178,7 +189,8 @@ def main():
     for config in combinations:
         f1, f2, steps, a_r, k, f_inc = config
         config_str = f"F1={f1}_F2={f2}_S={steps}_AR={a_r}_K={k}_Inc={f_inc}"
-        missing = [sf for sf in arm_names if sf not in all_results.get(config_str, {})]
+        done = all_results.get(config_str, {})
+        missing = [sf for sf in arm_names if sf not in done or sf in FORCE_ARMS]
         if not missing:
             continue
         configs_to_run.append((config, missing))

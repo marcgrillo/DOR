@@ -38,12 +38,15 @@ LOWER_TESTS = [('FTRL_DOR_ADJJ1', 'DORLP_DOR_ADJJ1'),
 CAPTION = (
     r"Summary of the two comparisons. Upper block: mean of each metric over "
     r"the whole simulation grid, with $95\%$ confidence intervals, for the "
-    r"four B-DOR algorithms (subscript dir: card counts ignored); the FTRL "
-    r"algorithms use $20$ replications per grid cell, the Bayesian ones $5$. Lower "
+    r"four B-DOR algorithms (subscript dir: card counts ignored); each "
+    r"algorithm is read on the replications it shares with its own "
+    r"direction-only version, $20$ per grid cell for the FTRL family and $5$ "
+    r"for the Bayesian one. Lower "
     r"block: the same means after the first elicitation session only "
     r"($T=1$), for the proposed estimators and the existing DOR methods, "
     r"SMAA-DOR \citep{corrente2025deck} and the original DOR method "
-    r"\citep{barbati2024deck}. Each Wilcoxon row reports "
+    r"\citep{barbati2024deck}, all four on the same $20$ replications per "
+    r"grid cell. Each Wilcoxon row reports "
     r"the $p$-value of a one-sided paired Wilcoxon signed-rank test of the "
     r"hypothesis that the first method scores higher than the second, "
     r"paired on the same simulated decision problems and restricted to the "
@@ -79,11 +82,11 @@ def pfmt(p):
     return f"${p:.3f}$"
 
 
-def mean_row(results, arm, T=None):
+def mean_row(results, arm, T=None, match=None):
     cells = []
     for met in METS:
         filt = {'T': T} if T else {}
-        mean, ci = m.mean_ci(m.pool(results, arm, met, **filt))
+        mean, ci = m.mean_ci(m.pool(results, arm, met, match=match, **filt))
         cells.append(f"${mean:.3f}{{\\scriptstyle\\pm{ci:.3f}}}$")
     return f"{LBL[arm]} & " + " & ".join(cells) + r" \\"
 
@@ -120,7 +123,9 @@ def main():
         r"(Section~\ref{sec:sim_results})}\\[2pt]",
     ]
     for arm in UPPER_ARMS:
-        lines.append(mean_row(results, arm))
+        # each family read on the replications it shares with its own
+        # direction-only version, so the ablation stays a paired comparison
+        lines.append(mean_row(results, arm, match=m.PARTNER.get(arm)))
     print("Upper-block tests (whole grid):")
     for a, b in UPPER_TESTS:
         lines.append(test_row(results, a, b))

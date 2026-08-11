@@ -55,6 +55,17 @@ ARMS_BDOR = ['FTRL_DOR_ADJJ1', 'BAYES_DOR_ADJJ1',
              'FTRLDIR_DOR_ADJJ1', 'BAYESDIR_DOR_ADJJ1']
 ARMS_BASELINES = ['FTRL_DOR_ADJJ1', 'BAYES_DOR_ADJJ1',
                   'SMAA_DOR_ADJJ1', 'DORLP_DOR_ADJJ1']
+# The direction-only ablation is a paired comparison, so the two bars of a
+# family must be read on the decision problems they share: since 2026-08-10
+# BAYES-DOR runs on all 20 problems per grid cell while BAYES_dir still runs on
+# 5. Used for the B-DOR figure and the upper block of tab:overall_summary only;
+# the T=1 comparison needs no matching (all four arms are on 20).
+PARTNER = {
+    'FTRL_DOR_ADJJ1': 'FTRLDIR_DOR_ADJJ1',
+    'FTRLDIR_DOR_ADJJ1': 'FTRL_DOR_ADJJ1',
+    'BAYES_DOR_ADJJ1': 'BAYESDIR_DOR_ADJJ1',
+    'BAYESDIR_DOR_ADJJ1': 'BAYES_DOR_ADJJ1',
+}
 
 plt.rcParams.update({
     'font.size': 15,
@@ -75,8 +86,10 @@ def parse_config(c):
     return {k: int(v) for k, v in zip(['F1', 'F2', 'S', 'AR', 'K', 'Inc'], m.groups())}
 
 
-def pool(results, arm, metric, T=None, **filters):
-    """Pooled per-table values under AR==K, T in T_LEVELS, given filters."""
+def pool(results, arm, metric, T=None, match=None, **filters):
+    """Pooled per-table values under AR==K, T in T_LEVELS, given filters.
+    With match=<other arm>, each cell is cut to the replications the two arms
+    share, so the mean is read on the same decision problems as its partner."""
     vals = []
     for c, arms in results.items():
         p = parse_config(c)
@@ -85,8 +98,11 @@ def pool(results, arm, metric, T=None, **filters):
         if any(p[k] != v for k, v in filters.items()):
             continue
         data = np.array(arms[arm][metric])
+        n = data.shape[1]
+        if match is not None and match in arms:
+            n = min(n, np.array(arms[match][metric]).shape[1])
         for t in ([T] if T else T_LEVELS):
-            vals.extend(data[t - 1])
+            vals.extend(data[t - 1][:n])
     return np.array(vals)
 
 
@@ -102,11 +118,13 @@ def mean_ci(v):
 
 
 # ---------------------------------------------------------------- fig_factors
-def _fig_factors_group(results, arms, fname, T_fix=None):
+def _fig_factors_group(results, arms, fname, T_fix=None, match_map=None):
     """Factors as rows, metrics as columns (portrait layout); grouped bars
     sorted best-to-worst within each level group; per-panel vertical scale.
     With T_fix, every panel is restricted to that horizon and the T row is
-    dropped (used for the one-shot baseline comparison at T = 1)."""
+    dropped (used for the one-shot baseline comparison at T = 1). With
+    match_map, each arm is cut to the replications it shares with its partner
+    (see PARTNER), so paired bars rest on the same decision problems."""
     from matplotlib.patches import Patch
     factors = [('F1', [10, 20, 35, 50], "Number of\nalternatives $|A|$"),
                ('F2', [3, 5, 7, 9], "Number of\ncriteria $m$"),
@@ -129,7 +147,9 @@ def _fig_factors_group(results, arms, fname, T_fix=None):
                 filt = dict(T=lv) if fac == 'T' else {fac: lv}
                 if T_fix is not None:
                     filt['T'] = T_fix
-                stats = {arm: mean_ci(pool(results, arm, metric, **filt))
+                stats = {arm: mean_ci(pool(results, arm, metric,
+                                           match=(match_map or {}).get(arm),
+                                           **filt))
                          for arm in arms}
                 # within each level group, bars sorted from best to worst
                 order = sorted(arms, key=lambda a: -stats[a][0])
@@ -163,8 +183,10 @@ def _fig_factors_group(results, arms, fname, T_fix=None):
 
 
 def fig_factors(results):
-    # single figure with the four B-DOR arms over the full grid
-    _fig_factors_group(results, ARMS_BDOR, "fig_factors_bdor_v1.png")
+    # single figure with the four B-DOR arms over the full grid, each family
+    # read on the replications it shares with its direction-only version
+    _fig_factors_group(results, ARMS_BDOR, "fig_factors_bdor_v1.png",
+                       match_map=PARTNER)
     # proposed estimators vs the one-shot existing DOR methods, at T = 1 only
     _fig_factors_group(results, ARMS_BASELINES, "fig_baselines_t1_v1.png",
                        T_fix=1)

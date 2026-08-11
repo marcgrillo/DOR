@@ -71,7 +71,7 @@ FACTORS = [
      lambda lv: f"${lv}\\%$"),
 ]
 
-def cell(results, arm, met, fac=None, lv=None, t_fix=None):
+def cell(results, arm, met, fac=None, lv=None, t_fix=None, match=None):
     filt = {}
     if fac == 'T':
         filt['T'] = lv
@@ -79,7 +79,7 @@ def cell(results, arm, met, fac=None, lv=None, t_fix=None):
         filt[fac] = lv
     if t_fix is not None:
         filt['T'] = t_fix
-    v = m.pool(results, arm, met, **filt)
+    v = m.pool(results, arm, met, match=match, **filt)
     mean, ci = m.mean_ci(v)
     return f"${mean:.3f}{{\\scriptstyle\\pm{ci:.3f}}}$"
 
@@ -128,7 +128,8 @@ def ptest(results, arm_a, arm_b, metric, fac, lv, t_fix=None):
 
 
 def factor_table(results, arms, header, label, ref, fac, levels, sym, desc,
-                 fmt, t_fix=None, blocknote="", tests=(), note=""):
+                 fmt, t_fix=None, blocknote="", tests=(), note="",
+                 match_map=None):
     lead = ("Single-session comparison ($T=1$): mean of each metric at each "
             f"level of {desc}" if t_fix is not None
             else f"Mean of each metric at each level of {desc}")
@@ -150,7 +151,8 @@ def factor_table(results, arms, header, label, ref, fac, levels, sym, desc,
     for b, (met, name) in enumerate(METS):
         for i, lv in enumerate(levels):
             head = f"\\multirow{{{len(levels)}}}{{*}}{{{name}}}" if i == 0 else ""
-            row = " & ".join(cell(results, a, met, fac, lv, t_fix=t_fix)
+            row = " & ".join(cell(results, a, met, fac, lv, t_fix=t_fix,
+                                  match=(match_map or {}).get(a))
                              for a in arms)
             trow = "".join(
                 " & " + ptest(results, a, b_, met, fac, lv, t_fix=t_fix)
@@ -172,7 +174,8 @@ def main():
                                    f"tab:app_{suff}", "tab:overall_summary",
                                    fac, levels, sym, desc, fmt,
                                    blocknote=" (upper block)",
-                                   tests=TESTS_BDOR, note=NOTE_BDOR))
+                                   tests=TESTS_BDOR, note=NOTE_BDOR,
+                                   match_map=m.PARTNER))
 
     # group 2: single-session comparison against the existing DOR methods
     for suff, fac, levels, sym, desc, fmt in FACTORS:
