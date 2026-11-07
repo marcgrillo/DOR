@@ -1,0 +1,36 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "bdor"
+version = "1.0.0"
+description = "Bayesian Deck-of-cards-based Ordinal Regression (B-DOR): BAYES-DOR and FTRL-DOR with sequential preference elicitation"
+readme = "README.md"
+license = { text = "MIT" }
+authors = [
+    { name = "Marco Grillo" },
+    { name = "Silvano Zappalà" },
+]
+requires-python = ">=3.10"
+dependencies = [
+    "numpy",
+    "scipy",
+    "pandas",
+    "matplotlib",
+    "tqdm",
+    "jax",
+    "jaxlib",
+    "numpyro",
+]
+
+[project.optional-dependencies]
+case-study = ["corner"]
+test = ["pytest"]
+
+[tool.setuptools]
+packages = ["bdor", "bdor.baselines"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]

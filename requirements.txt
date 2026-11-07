@@ -1,8 +1,14 @@
-numpy
-scipy
-pandas
-matplotlib
-tqdm
-jax
-jaxlib
-numpyro
+# Exact versions that produced the results in the paper (Python 3.11.9, Windows 11, CPU).
+# Newer versions should work, but JAX/NumPyro updates can change Monte Carlo draws.
+numpy==1.26.4
+scipy==1.17.1
+pandas==2.2.2
+matplotlib==3.9.2
+tqdm==4.66.5
+jax==0.4.26
+jaxlib==0.4.26
+numpyro==0.19.0
+
+# Optional
+corner==2.2.2   # case-study corner plot (Figure 7)
+pytest==7.4.4   # test suite (tests/)

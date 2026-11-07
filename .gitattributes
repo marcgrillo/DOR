@@ -1,0 +1,7 @@
+# Line endings: LF in the repository and in every working copy, so regenerated
+# outputs (written with LF) compare byte-for-byte with the committed ones.
+* text=auto eol=lf
+*.png binary
+*.pdf binary
+*.npz binary
+*.npy binary

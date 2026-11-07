@@ -1,28 +1,44 @@
-# Byte-compiled / optimized / DLL files
+# ---------------------------------------------------------------------------
+# Local-only folders: never pushed to GitHub (see README, "Repository layout")
+# ---------------------------------------------------------------------------
+# Superseded scripts, old results, run logs, git-history backup
+archive/
+
+# Raw simulation data (~23 GB: datasets, per-session samples, metric caches)
+data/*
+!data/README.md
+# ...except the two dataset folders Figure 5 (regret) needs, so it can be
+# rebuilt from a fresh clone
+!data/datasets/
+data/datasets/*
+!data/datasets/grid_F1=10_F2=3_S=10_AR=5_K=5_Inc=0/
+!data/datasets/grid_F1=10_F2=3_S=10_AR=5_K=5_Inc=50/
+
+# Exploratory plots written by the study scripts (regenerable, not in the paper)
+outputs/diagnostics/
+# Plots the interactive example writes next to its input file
+examples/**/*.png
+
+# Run logs
+*.log
+
+# ---------------------------------------------------------------------------
+# Python, environments, tools
+# ---------------------------------------------------------------------------
 __pycache__/
 *.py[cod]
 *$py.class
-
-# Data and Results
-datasets/
-samples/
-figs/
-tests/
-user_inference/*.png
-user_inference/*.npy
-*.csv
-grid_results_tiny.npz
-
-# OS and IDE
-.vscode/
-.idea/
-.DS_Store
-Thumbs.db
-
-# Virtual environments
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+.ipynb_checkpoints/
 .venv/
 venv/
 env/
-bin/
-lib/
-include/
+.vscode/
+.idea/
+.claude/settings.local.json
+.DS_Store
+Thumbs.db
+desktop.ini

@@ -1,0 +1,253 @@
+case,step,method,region,rank,utility
+LIN,1,FTRL,Veneto,1,96.0885
+LIN,1,FTRL,Tuscany,2,95.313
+LIN,1,FTRL,Emilia Romagna,3,92.7972
+LIN,1,FTRL,Autonomous Province of Trento,4,92.7411
+LIN,1,FTRL,Piedmont,5,90.1328
+LIN,1,FTRL,Lombardy,6,85.9181
+LIN,1,FTRL,Umbria,7,85.8965
+LIN,1,FTRL,Marche,8,82.2887
+LIN,1,FTRL,Friuli Venezia Giulia,9,78.4959
+LIN,1,FTRL,Apulia,10,75.7945
+LIN,1,FTRL,Liguria,11,72.3597
+LIN,1,FTRL,Lazio,12,71.5349
+LIN,1,FTRL,Campania,13,68.4273
+LIN,1,FTRL,Autonomous Province of Bolzano,14,67.1654
+LIN,1,FTRL,Molise,15,64.1979
+LIN,1,FTRL,Sardinia,16,64.0944
+LIN,1,FTRL,Basilicata,17,63.0374
+LIN,1,FTRL,Abruzzo,18,60.1098
+LIN,1,FTRL,Calabria,19,59.0807
+LIN,1,FTRL,Sicily,20,57.0547
+LIN,1,FTRL,Aosta Valley,21,55.6393
+LIN,1,BAYES,Veneto,1,96.0856
+LIN,1,BAYES,Tuscany,2,95.3148
+LIN,1,BAYES,Emilia Romagna,3,92.8057
+LIN,1,BAYES,Autonomous Province of Trento,4,92.7724
+LIN,1,BAYES,Piedmont,5,90.1284
+LIN,1,BAYES,Lombardy,6,85.9436
+LIN,1,BAYES,Umbria,7,85.9087
+LIN,1,BAYES,Marche,8,82.2999
+LIN,1,BAYES,Friuli Venezia Giulia,9,78.4813
+LIN,1,BAYES,Apulia,10,75.8257
+LIN,1,BAYES,Liguria,11,72.3388
+LIN,1,BAYES,Lazio,12,71.5641
+LIN,1,BAYES,Campania,13,68.4236
+LIN,1,BAYES,Autonomous Province of Bolzano,14,67.1197
+LIN,1,BAYES,Molise,15,64.1721
+LIN,1,BAYES,Sardinia,16,64.0808
+LIN,1,BAYES,Basilicata,17,63.0746
+LIN,1,BAYES,Abruzzo,18,60.1827
+LIN,1,BAYES,Calabria,19,59.1444
+LIN,1,BAYES,Sicily,20,57.1225
+LIN,1,BAYES,Aosta Valley,21,55.6882
+LIN,2,FTRL,Veneto,1,96.4596
+LIN,2,FTRL,Tuscany,2,95.2163
+LIN,2,FTRL,Emilia Romagna,3,93.2176
+LIN,2,FTRL,Autonomous Province of Trento,4,92.7195
+LIN,2,FTRL,Piedmont,5,90.6893
+LIN,2,FTRL,Umbria,6,86.6643
+LIN,2,FTRL,Lombardy,7,86.6386
+LIN,2,FTRL,Marche,8,80.7157
+LIN,2,FTRL,Friuli Venezia Giulia,9,79.2696
+LIN,2,FTRL,Apulia,10,74.6913
+LIN,2,FTRL,Liguria,11,70.0899
+LIN,2,FTRL,Lazio,12,69.4467
+LIN,2,FTRL,Campania,13,67.5392
+LIN,2,FTRL,Autonomous Province of Bolzano,14,66.9679
+LIN,2,FTRL,Sardinia,15,64.5937
+LIN,2,FTRL,Molise,16,63.9294
+LIN,2,FTRL,Basilicata,17,62.8145
+LIN,2,FTRL,Calabria,18,58.7632
+LIN,2,FTRL,Aosta Valley,19,57.629
+LIN,2,FTRL,Abruzzo,20,57.2343
+LIN,2,FTRL,Sicily,21,54.0174
+LIN,2,BAYES,Veneto,1,96.3382
+LIN,2,BAYES,Tuscany,2,95.2486
+LIN,2,BAYES,Emilia Romagna,3,93.0876
+LIN,2,BAYES,Autonomous Province of Trento,4,92.7462
+LIN,2,BAYES,Piedmont,5,90.5074
+LIN,2,BAYES,Umbria,6,86.4247
+LIN,2,BAYES,Lombardy,7,86.4227
+LIN,2,BAYES,Marche,8,81.2293
+LIN,2,BAYES,Friuli Venezia Giulia,9,79.0112
+LIN,2,BAYES,Apulia,10,75.0662
+LIN,2,BAYES,Liguria,11,70.8077
+LIN,2,BAYES,Lazio,12,70.1376
+LIN,2,BAYES,Campania,13,67.8228
+LIN,2,BAYES,Autonomous Province of Bolzano,14,67.0028
+LIN,2,BAYES,Sardinia,15,64.4244
+LIN,2,BAYES,Molise,16,63.9996
+LIN,2,BAYES,Basilicata,17,62.9097
+LIN,2,BAYES,Calabria,18,58.9055
+LIN,2,BAYES,Abruzzo,19,58.2062
+LIN,2,BAYES,Aosta Valley,20,57.019
+LIN,2,BAYES,Sicily,21,55.0381
+LIN,3,FTRL,Veneto,1,96.9427
+LIN,3,FTRL,Tuscany,2,95.1211
+LIN,3,FTRL,Emilia Romagna,3,94.1027
+LIN,3,FTRL,Autonomous Province of Trento,4,93.5814
+LIN,3,FTRL,Piedmont,5,91.4141
+LIN,3,FTRL,Lombardy,6,88.4669
+LIN,3,FTRL,Umbria,7,88.1859
+LIN,3,FTRL,Friuli Venezia Giulia,8,80.0315
+LIN,3,FTRL,Marche,9,78.6366
+LIN,3,FTRL,Apulia,10,73.8992
+LIN,3,FTRL,Lazio,11,67.096
+LIN,3,FTRL,Campania,12,66.0757
+LIN,3,FTRL,Liguria,13,66.0293
+LIN,3,FTRL,Autonomous Province of Bolzano,14,65.3603
+LIN,3,FTRL,Sardinia,15,64.9677
+LIN,3,FTRL,Basilicata,16,63.537
+LIN,3,FTRL,Molise,17,62.7818
+LIN,3,FTRL,Aosta Valley,18,62.0613
+LIN,3,FTRL,Calabria,19,60.099
+LIN,3,FTRL,Abruzzo,20,54.9324
+LIN,3,FTRL,Sicily,21,51.3205
+LIN,3,BAYES,Veneto,1,96.7304
+LIN,3,BAYES,Tuscany,2,95.1665
+LIN,3,BAYES,Emilia Romagna,3,93.753
+LIN,3,BAYES,Autonomous Province of Trento,4,93.3062
+LIN,3,BAYES,Piedmont,5,91.0957
+LIN,3,BAYES,Lombardy,6,87.7671
+LIN,3,BAYES,Umbria,7,87.578
+LIN,3,BAYES,Friuli Venezia Giulia,8,79.6682
+LIN,3,BAYES,Marche,9,79.5465
+LIN,3,BAYES,Apulia,10,74.3222
+LIN,3,BAYES,Lazio,11,68.1717
+LIN,3,BAYES,Liguria,12,67.6849
+LIN,3,BAYES,Campania,13,66.683
+LIN,3,BAYES,Autonomous Province of Bolzano,14,65.9096
+LIN,3,BAYES,Sardinia,15,64.7712
+LIN,3,BAYES,Basilicata,16,63.3373
+LIN,3,BAYES,Molise,17,63.1932
+LIN,3,BAYES,Aosta Valley,18,60.328
+LIN,3,BAYES,Calabria,19,59.7155
+LIN,3,BAYES,Abruzzo,20,56.1115
+LIN,3,BAYES,Sicily,21,52.6517
+PW,1,FTRL,Veneto,1,94.4813
+PW,1,FTRL,Tuscany,2,92.5699
+PW,1,FTRL,Autonomous Province of Trento,3,91.9234
+PW,1,FTRL,Emilia Romagna,4,90.67
+PW,1,FTRL,Piedmont,5,85.4237
+PW,1,FTRL,Lombardy,6,82.4606
+PW,1,FTRL,Umbria,7,81.1053
+PW,1,FTRL,Marche,8,69.2805
+PW,1,FTRL,Friuli Venezia Giulia,9,66.5397
+PW,1,FTRL,Apulia,10,62.4376
+PW,1,FTRL,Liguria,11,56.0407
+PW,1,FTRL,Lazio,12,55.2042
+PW,1,FTRL,Campania,13,50.4168
+PW,1,FTRL,Autonomous Province of Bolzano,14,49.1233
+PW,1,FTRL,Molise,15,46.4326
+PW,1,FTRL,Sardinia,16,45.7825
+PW,1,FTRL,Basilicata,17,44.8629
+PW,1,FTRL,Abruzzo,18,44.8054
+PW,1,FTRL,Aosta Valley,19,42.7849
+PW,1,FTRL,Sicily,20,42.0212
+PW,1,FTRL,Calabria,21,40.9402
+PW,1,BAYES,Veneto,1,94.6897
+PW,1,BAYES,Tuscany,2,93.3567
+PW,1,BAYES,Autonomous Province of Trento,3,91.7704
+PW,1,BAYES,Emilia Romagna,4,90.842
+PW,1,BAYES,Piedmont,5,86.3573
+PW,1,BAYES,Lombardy,6,82.5692
+PW,1,BAYES,Umbria,7,81.7056
+PW,1,BAYES,Marche,8,73.7667
+PW,1,BAYES,Friuli Venezia Giulia,9,69.4064
+PW,1,BAYES,Apulia,10,66.4383
+PW,1,BAYES,Liguria,11,61.5435
+PW,1,BAYES,Lazio,12,60.5055
+PW,1,BAYES,Campania,13,55.6745
+PW,1,BAYES,Autonomous Province of Bolzano,14,54.3442
+PW,1,BAYES,Molise,15,51.3816
+PW,1,BAYES,Sardinia,16,50.6805
+PW,1,BAYES,Basilicata,17,49.6942
+PW,1,BAYES,Abruzzo,18,49.6269
+PW,1,BAYES,Sicily,19,46.6597
+PW,1,BAYES,Calabria,20,45.6834
+PW,1,BAYES,Aosta Valley,21,45.2126
+PW,2,FTRL,Veneto,1,93.585
+PW,2,FTRL,Tuscany,2,91.0532
+PW,2,FTRL,Autonomous Province of Trento,3,88.2969
+PW,2,FTRL,Emilia Romagna,4,88.2796
+PW,2,FTRL,Piedmont,5,82.8873
+PW,2,FTRL,Lombardy,6,77.3395
+PW,2,FTRL,Umbria,7,76.6112
+PW,2,FTRL,Marche,8,62.9116
+PW,2,FTRL,Friuli Venezia Giulia,9,61.0927
+PW,2,FTRL,Apulia,10,53.3761
+PW,2,FTRL,Liguria,11,49.7193
+PW,2,FTRL,Lazio,12,45.1189
+PW,2,FTRL,Autonomous Province of Bolzano,13,42.8535
+PW,2,FTRL,Campania,14,41.5138
+PW,2,FTRL,Molise,15,38.3284
+PW,2,FTRL,Sardinia,16,36.4894
+PW,2,FTRL,Basilicata,17,34.37
+PW,2,FTRL,Aosta Valley,18,33.7885
+PW,2,FTRL,Abruzzo,19,33.6932
+PW,2,FTRL,Sicily,20,31.0361
+PW,2,FTRL,Calabria,21,29.908
+PW,2,BAYES,Veneto,1,93.8799
+PW,2,BAYES,Tuscany,2,91.5095
+PW,2,BAYES,Autonomous Province of Trento,3,88.8196
+PW,2,BAYES,Emilia Romagna,4,88.812
+PW,2,BAYES,Piedmont,5,83.7072
+PW,2,BAYES,Lombardy,6,78.3575
+PW,2,BAYES,Umbria,7,77.6908
+PW,2,BAYES,Marche,8,64.9055
+PW,2,BAYES,Friuli Venezia Giulia,9,63.014
+PW,2,BAYES,Apulia,10,55.7622
+PW,2,BAYES,Liguria,11,51.9079
+PW,2,BAYES,Lazio,12,47.8429
+PW,2,BAYES,Autonomous Province of Bolzano,13,45.2774
+PW,2,BAYES,Campania,14,44.3314
+PW,2,BAYES,Molise,15,40.943
+PW,2,BAYES,Sardinia,16,39.3634
+PW,2,BAYES,Basilicata,17,38.2327
+PW,2,BAYES,Aosta Valley,18,37.6834
+PW,2,BAYES,Abruzzo,19,37.4471
+PW,2,BAYES,Sicily,20,34.7528
+PW,2,BAYES,Calabria,21,34.4488
+PW,3,FTRL,Veneto,1,93.9834
+PW,3,FTRL,Tuscany,2,91.8981
+PW,3,FTRL,Autonomous Province of Trento,3,90.8123
+PW,3,FTRL,Emilia Romagna,4,89.683
+PW,3,FTRL,Piedmont,5,84.1171
+PW,3,FTRL,Lombardy,6,80.4936
+PW,3,FTRL,Umbria,7,79.1798
+PW,3,FTRL,Marche,8,66.5964
+PW,3,FTRL,Friuli Venezia Giulia,9,63.6594
+PW,3,FTRL,Apulia,10,58.8371
+PW,3,FTRL,Liguria,11,52.0721
+PW,3,FTRL,Lazio,12,50.9303
+PW,3,FTRL,Campania,13,45.9447
+PW,3,FTRL,Autonomous Province of Bolzano,14,45.2877
+PW,3,FTRL,Molise,15,42.1149
+PW,3,FTRL,Sardinia,16,41.7019
+PW,3,FTRL,Basilicata,17,37.4183
+PW,3,FTRL,Abruzzo,18,35.6191
+PW,3,FTRL,Aosta Valley,19,33.7506
+PW,3,FTRL,Sicily,20,32.2931
+PW,3,FTRL,Calabria,21,31.1036
+PW,3,BAYES,Veneto,1,94.1568
+PW,3,BAYES,Tuscany,2,91.8893
+PW,3,BAYES,Autonomous Province of Trento,3,90.5176
+PW,3,BAYES,Emilia Romagna,4,89.771
+PW,3,BAYES,Piedmont,5,84.4111
+PW,3,BAYES,Lombardy,6,80.5372
+PW,3,BAYES,Umbria,7,79.3855
+PW,3,BAYES,Marche,8,66.1641
+PW,3,BAYES,Friuli Venezia Giulia,9,64.2301
+PW,3,BAYES,Apulia,10,58.3733
+PW,3,BAYES,Liguria,11,51.8703
+PW,3,BAYES,Lazio,12,50.2354
+PW,3,BAYES,Campania,13,45.9929
+PW,3,BAYES,Autonomous Province of Bolzano,14,45.6314
+PW,3,BAYES,Molise,15,42.2408
+PW,3,BAYES,Sardinia,16,41.7572
+PW,3,BAYES,Basilicata,17,39.2329
+PW,3,BAYES,Aosta Valley,18,37.3206
+PW,3,BAYES,Abruzzo,19,37.2232
+PW,3,BAYES,Calabria,20,34.2491
+PW,3,BAYES,Sicily,21,34.065
