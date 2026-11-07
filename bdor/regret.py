@@ -1,13 +1,14 @@
 """Best-fixed-in-hindsight benchmark for the regret study (paper Sec. 5.7, Figure 5).
 
-The regret of an online learner after session T is its cumulative prequential
-log-loss minus the cumulative loss of the single parameter vector chosen with
-hindsight.  The comparator used in the paper is the *unpenalised* maximum-likelihood
-fit on all sessions' gap observations, computed here by L-BFGS-B with exact JAX
-gradients (box ``omega >= 1e-6``, no prior).
+The regret (paper eq. (6)) of an online learner after session T is its cumulative
+prequential log-loss (eq. (13)) minus the cumulative loss of the single parameter vector
+chosen with hindsight.  The comparator used in the paper is the *unpenalised*
+maximum-likelihood fit on all sessions' gap observations, computed here by L-BFGS-B with
+exact JAX gradients (box ``omega >= 1e-6``, no prior).
 
-The online losses themselves are recorded during the simulation
-(``loss_<j>.npy`` sidecars, stored in the grid npz under ``'log_loss'``).
+The online losses themselves are recorded during the simulation (``loss_<t>.npy``
+sidecars, stored in the grid npz under ``'log_loss'``); ``scripts/paper/make_figures.py``
+subtracts the hindsight curves computed here from them to draw Figure 5.
 """
 import os
 
@@ -15,17 +16,23 @@ import numpy as np
 
 from bdor.paths import DATASETS_DIR
 
-ETA_MAX = 5
+ETA_MAX = 5  # e_max of the grid campaign
 
 
 def hindsight_loss(dataset_fold, f1, f2, steps, hm, expansion, return_curves=False,
                    eta_max=ETA_MAX):
     """Cumulative per-session loss of the best fixed parameter in hindsight.
 
+    For each replication, the composite likelihood of paper eqs. (11)-(12) is maximised
+    once on the gap observations of all ``steps`` sessions (L-BFGS-B from omega = 0.5,
+    bounds omega >= 1e-6); the fitted parameter is then scored with the log-loss (13) of
+    each session.
+
     Parameters
     ----------
     dataset_fold : str
-        Dataset folder name under ``data/datasets`` (e.g. ``'grid_F1=10_F2=3_S=10_AR=5_K=5_Inc=0'``).
+        Dataset folder name under ``data/datasets``
+        (e.g. ``'grid_F1=10_F2=3_S=10_AR=5_K=5_Inc=0'``).
     f1, f2, steps : int
         Number of alternatives |A|, criteria m and sessions stored in the dataset.
     hm : int
@@ -36,7 +43,21 @@ def hindsight_loss(dataset_fold, f1, f2, steps, hm, expansion, return_curves=Fal
         If True return the per-table curves (hm x steps), otherwise their mean (steps,).
     eta_max : int
         Maximum number of blank cards e_max of the likelihood.
+
+    Returns
+    -------
+    ndarray
+        Cumulative negative log-likelihood (nats) after sessions 1, ..., ``steps``:
+        shape (steps,), or (min(hm, n_replications), steps) with ``return_curves=True``.
+
+    Notes
+    -----
+    Card counts are used as stored, without the ``eta_cap`` that the simulation passes
+    to ``expand_subrank``. With ``expansion='adjacent'`` on datasets generated with the
+    same e_max every count is already within [0, e_max]; a summed all-pairs count above
+    ``eta_max`` would contribute zero loss.
     """
+    # Heavy imports (JAX) are deferred so that importing bdor.regret stays light.
     from scipy.optimize import minimize as sp_minimize
     import jax
     import jax.numpy as jnp
@@ -45,7 +66,7 @@ def hindsight_loss(dataset_fold, f1, f2, steps, hm, expansion, return_curves=Fal
     from bdor.engine import _jax_log_prob_per_obs, RHO
     from bdor.simulation import expand_subrank
 
-    tables, rankings, dm_prefs, _ = utils.read_dataset(
+    tables, _, dm_prefs, _ = utils.read_dataset(
         os.path.join(DATASETS_DIR, dataset_fold), f1, f2, steps)
     curves = []
     for i in range(min(hm, len(tables))):

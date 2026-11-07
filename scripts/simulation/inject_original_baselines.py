@@ -1,45 +1,48 @@
-"""
-Add the paper's DOR and SMAA-DOR baselines to the aggregated grid results.
+"""Add the paper's DOR and SMAA-DOR baselines to the aggregated grid results.
 
-Pipeline step 3 of 3 for the main simulation (after ``run_grid.py`` and
-``run_original_baselines.py``). It reads the T = 1 metrics of the DOR and SMAA-DOR
-baselines in their original single-session formulation (paper Sec. 2.2;
-``bdor/baselines/smaa_original.py``) from ``results/original_comparison.csv`` and
-stores them in ``results/grid_results_joint_v1.npz`` as two new arms per configuration:
+Reads the T = 1 metrics of the original single-session DOR and SMAA-DOR (paper Sec. 2.2) from
+the CSV of run_original_baselines.py and stores them, in place, as two new arms of every
+configuration of the results npz: SMAA_DOR_ORIG (CSV rows SMAAORIG_T1) and DORLP_DOR_ORIG (rows
+DORLPORIG_T1), with ``asrs`` / ``asps`` / ``aios`` of shape (1 session, 20 replications). Other
+arms are untouched (the adapted SMAA_DOR_ADJJ1 / DORLP_DOR_ADJJ1 stay for provenance; no paper
+table or figure reads them). Step 3 of 3 of the main simulation pipeline.
 
-    SMAA_DOR_ORIG   (from rows SMAAORIG_T1: Hit-and-Run sample of the compatible set)
-    DORLP_DOR_ORIG  (from rows DORLPORIG_T1: DOR linear-programming point estimate)
+Paper:   Table 3 (lower block), Figure 3 and Supplementary Tables B.6-B.9
+Inputs:  results/original_comparison.csv, results/grid_results_joint_v1.npz
+Outputs: results/grid_results_joint_v1.npz (rewritten in place)
+Runtime: a few seconds
 
-Each arm holds ``asrs`` / ``asps`` / ``aios`` with a single session row (T = 1, the only
-horizon at which the one-shot methods are compared) and 20 replications. The npz is
-rewritten in place; all other arms are left untouched (the adapted per-gap arms
-SMAA_DOR_ADJJ1 / DORLP_DOR_ADJJ1 stay for provenance but no paper output reads them).
-
-Used by: Table 3 (lower block), Figure 3 and Supplementary Tables B.6-B.9.
-
-Usage (seconds):
+Usage:
     python scripts/simulation/inject_original_baselines.py [--npz PATH] [--csv PATH]
+
+(formerly inject_original_arms.py)
 """
-import argparse
-import csv
 import sys
 from pathlib import Path
-
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))  # repo root, so `import bdor` works without installing
+import argparse
+import csv
+import os
 
 import numpy as np
 
 from bdor.paths import GRID_RESULTS, RESULTS_DIR
 
-N_TABLES = 20
+N_TABLES = 20   # replications per configuration (HM_0 of run_grid.py)
+# CSV method -> npz arm
 ARM_MAP = {"SMAAORIG_T1": "SMAA_DOR_ORIG", "DORLPORIG_T1": "DORLP_DOR_ORIG"}
 
 
 def inject(npz_path, csv_path):
-    """Write the SMAAORIG_T1 / DORLPORIG_T1 rows of ``csv_path`` into ``npz_path`` (in place)."""
-    data = np.load(npz_path, allow_pickle=True)
-    results = data["results"].item()
-    extra = {k: data[k] for k in data.files if k != "results"}
+    """Write the SMAAORIG_T1 / DORLPORIG_T1 rows of ``csv_path`` into ``npz_path`` (in place).
+
+    Every other key of the npz (``run_tag``, ``run_seed``, ``eta_max``) is preserved. CSV
+    configurations missing from the npz are skipped and counted; replications without a CSV
+    row stay NaN.
+    """
+    with np.load(npz_path, allow_pickle=True) as data:  # closed before the file is replaced
+        results = data["results"].item()
+        extra = {k: data[k] for k in data.files if k != "results"}
 
     new = {}   # config_str -> arm -> metric -> 1 x N_TABLES
     with open(csv_path) as fh:
@@ -65,7 +68,10 @@ def inject(npz_path, csv_path):
             results[cfg][arm] = {m: v.tolist() for m, v in mets.items()}
         n_cfg += 1
 
-    np.savez_compressed(npz_path, results=results, **extra)
+    # atomic rewrite: temporary file next to the target, then os.replace
+    tmp = str(npz_path) + ".tmp.npz"
+    np.savez_compressed(tmp, results=results, **extra)
+    os.replace(tmp, npz_path)
     print(f"injected {list(ARM_MAP.values())} into {n_cfg} configs "
           f"({n_missing} CSV configs not in npz)")
     counts = [sum(np.isfinite(np.array(results[c]['SMAA_DOR_ORIG']['asrs'][0])))

@@ -1,34 +1,54 @@
-"""Why AIO peaks at k=4: what enlarging the displayed subset does to the
-individual judgements, measured on the whole generated grid.
+"""Subset-size and noise statistics of the grid data behind statements of Sec. 5.1 and 5.3.
 
-For each subset size k it reports
-  - the mean true utility distance between ADJACENT displayed alternatives
-    (order statistics get closer as the subset grows);
-  - the share of declared adjacent judgements carrying zero blank cards,
-    split by noise level;
-  - the realized share of FLIPPED adjacent judgements (declared order
-    contradicting the true one), by noise level and pooled;
-  - AIO against k SEPARATELY at each noise level, which is the decisive
-    evidence: with a consistent DM the zero-card share still grows with k
-    yet AIO keeps improving, so the dip is caused by the flipped
-    judgements, not by the dilution of the intensity information.
-It also reports the flip share by |A| and by m, which is what the claim in
-Section~\ref{sec:sim_design} rests on.
-Run from the DOR folder.
+Expands every declared ranking of the 192 S = 10, AR == K grid datasets into its adjacent
+gap observations (bdor.simulation.expand_subrank, e_max = 5) and compares them with the
+true utilities. It prints:
+  - per subset size k: the mean true-utility distance between adjacent declared levels,
+    the share of gaps with zero blank cards, the share of flipped adjacent judgements
+    (declared order contradicting the true utilities; Finc > 0 only) and the mean
+    true-utility gap between the best and second-best alternative of the problem;
+  - the flipped and the zero-card shares by k and Finc level;
+  - the flipped share by |A| and by m (Finc > 0 only);
+  - from the grid results, the AIO of the four B-DOR arms by k at each Finc level (pooled
+    over |A|, m and T in {1, 3, 5, 10}), with a two-sided Mann-Whitney test of k = 4
+    against k = 5. Splitting AIO by Finc separates the two candidate causes of the AIO
+    peak at k = 4: the zero-card share grows with k at every Finc level, while flipped
+    judgements occur only when Finc > 0.
+
+The first AIO block pools each arm over all its stored replications (bdor.results.pool
+without match): 20 per cell for FTRL-DOR, FTRLdir and BAYES-DOR, 5 for BAYESdir. The last
+block repeats the means with each family read on the replications it shares with its
+direction-only partner, the convention of Figure 2 and Tables 3 and B.1-B.5 (BAYES-DOR on
+5); this is the reading of the AIO-by-k values quoted in Sec. 5.3.
+
+Paper:   Sec. 5.1, flip shares after Table 1 (21.0% at m = 3 to 23.9% at m = 9, 18.7% at
+         k = 3 to 24.5% at k = 5: adjacent judgements, Finc > 0); Sec. 5.3, subset-size
+         paragraph (mean distance 0.120 at k = 3 to 0.090 at k = 5; AIO by k at Finc = 0%)
+Inputs:  data/datasets/grid_F1=*_F2=*_S=10_AR=<k>_K=<k>_Inc=*/ (the full local datasets
+         folder; the script stops if any of the 192 folders is missing),
+         results/grid_results_joint_v1.npz
+Outputs: stdout only
+Runtime: a few seconds
+
+Usage:
+    python scripts/paper/subset_density.py
+
+(formerly analyze_subset_density_v1.py)
 """
-import sys
-from pathlib import Path
-sys.path.insert(0, str(Path(__file__).resolve().parents[2]))  # repo root, so `import bdor` works without installing
 import os
+import sys
 from collections import defaultdict
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))  # repo root, so `import bdor` works without installing
 
 import numpy as np
 from scipy.stats import mannwhitneyu
 
 from bdor import utils
-from bdor.simulation import expand_subrank
-from bdor import results as m
 from bdor.paths import DATASETS_DIR
+from bdor.results import PARTNER, load_results, mean_ci, pool
+from bdor.simulation import expand_subrank
 
 F1_LEVELS = [10, 20, 35, 50]
 F2_LEVELS = [3, 5, 7, 9]
@@ -39,6 +59,7 @@ ETA_MAX = 5
 
 
 def main():
+    """Compute the dataset statistics and the AIO-by-k block, and print them."""
     dU = defaultdict(list)                      # k -> adjacent |delta U|
     top_gap = defaultdict(list)                 # k -> U(best) - U(second)
     zero = defaultdict(lambda: [0, 0])          # k -> [eta==0, total]
@@ -87,7 +108,10 @@ def main():
                                         d[key][1] += 1
 
     if missing:
-        print(f"(skipped {missing} missing dataset folders)\n")
+        total = len(F1_LEVELS) * len(F2_LEVELS) * len(INC_LEVELS) * len(K_LEVELS)
+        sys.exit(f"subset_density.py needs all {total} grid dataset folders with AR == K under "
+                 f"{DATASETS_DIR} ({missing} missing). They are not part of the public "
+                 "repository; see data/README.md.")
 
     print("=== per subset size k (whole grid) ===")
     for k in K_LEVELS:
@@ -123,21 +147,32 @@ def main():
     print("  " + "  ".join(f"m={b}: {flip_m[b][0] / flip_m[b][1]:.1%}"
                            for b in F2_LEVELS))
 
-    # ---- decisive test: AIO against k, separately at each noise level ------
+    # ---- AIO against k, separately at each noise level (see the docstring) ----
     print("\n=== AIO by k at each noise level (dip only where flips exist) ===")
-    res = m.load_results()
+    res = load_results()
     arms = [('FTRL_DOR_ADJJ1', 'FTRL'), ('BAYES_DOR_ADJJ1', 'BAYES'),
             ('FTRLDIR_DOR_ADJJ1', 'FTRLd'), ('BAYESDIR_DOR_ADJJ1', 'BAYESd')]
     for inc in INC_LEVELS:
         print(f"  |F_inc| = {inc}%")
         for arm, lbl in arms:
-            vals = [m.pool(res, arm, 'aios', K=k, Inc=inc) for k in K_LEVELS]
+            vals = [pool(res, arm, 'aios', K=k, Inc=inc) for k in K_LEVELS]
             vals = [v[~np.isnan(v)] for v in vals]
             means = [v.mean() for v in vals]
             p = mannwhitneyu(vals[1], vals[2], alternative='two-sided').pvalue
             tag = "monotone" if means[2] >= means[1] else "DIP at k=5"
             print(f"    {lbl:<7} {means[0]:.3f} {means[1]:.3f} {means[2]:.3f}"
                   f"   k4->k5 {means[2] - means[1]:+.3f} (p={p:.3f})  {tag}")
+
+    # ---- the same means with each family on the replications shared with its partner ----
+    print("\n=== AIO by k (k = 3/4/5), each family read on the replications it shares with "
+          "its direction-only partner (as in Figure 2 and Tables B.1-B.5) ===")
+    for inc in INC_LEVELS:
+        cells = []
+        for arm, lbl in arms:
+            means = [mean_ci(pool(res, arm, 'aios', K=k, Inc=inc, match=PARTNER[arm]))[0]
+                     for k in K_LEVELS]
+            cells.append(f"{lbl} " + "/".join(f"{x:.3f}" for x in means))
+        print(f"  |F_inc| = {inc:>2}%:  " + "   ".join(cells))
 
 
 if __name__ == "__main__":

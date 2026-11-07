@@ -1,49 +1,63 @@
-"""
-Case study for the B-DOR paper revision (Section 6): ranking the 21 Italian
-regions on healthcare performance (LEA criteria) under the ADJACENT-ONLY
-likelihood and the new inference engine.
+"""Illustrative example of Section 6: ranking 21 Italian regions on the LEA criteria.
 
-Structure (2026-08-14 revision, Marco's restructure): BOTH illustration cases
-run the same three elicitation sessions (T = 3, cumulative) and differ only in
-the marginal utility functions -- case LIN uses gamma_j = 1 (linear), case PW
-uses gamma_j = 3 (piecewise linear).  Outputs per case: a corner plot of the
-RAW per-criterion totals U_j(100) after each session with the FTRL estimates
-overlaid (croner_steps_{lin,pw}.png), FTRL parameter and ranking tables with
-one row/column group per session, full RAI/PWI supplementary tables for the
-final posterior (table_S1-S4), and RAI/PWI EVOLUTION tables across sessions
-for the four top-ranked regions (table_{rai,pwi}_evolution_{lin,pw}.tex).
+Runs FTRL-DOR and BAYES-DOR on the paper's illustrative example and writes all of its figures
+and tables. The data are embedded below: Table 4 (21 regions scored in [0, 100] on the three LEA
+macro-areas Prevention care g1, Primary care g2 and Hospital care g3, all increasing) and the
+three elicitation sessions of Figure 6. The script is self-contained: it reads nothing from
+data/ or results/, and it is the only producer of outputs/case_study/.
 
-Original migration-plan items E1-E6 (Decision 1: e_max = 30):
-  E1  Data and elicitation sessions hard-coded from main_EJOR_1.tex
-      (tab:LEA_data, fig:example_t1, fig:example_t3).
-  E2  Responses are RAW card counts on consecutive gaps only: a subrank
-      A -e1- B -e2- C contributes (A,B,e1), (B,C,e2).  No nu(a), no +1,
-      no summing across gaps (expand_subrank(..., expansion='adjacent')).
-  E3  Protocol cap: e_max = n_max = 30 for BOTH the T=1 and the T=3 case,
-      so the threshold vector Delta has 30 components in each case and the
-      two illustrations share the same response space.  The largest declared
-      card count is 28 <= 30 (asserted below).
-  E4  After every session (cumulatively) we compute the BAYES-DOR posterior
-      via HMC (2000 draws / 1000 warmup, Gamma(1,1) prior) and the FTRL-DOR
-      constrained MAP (Gamma(2,1) prior), as implemented in inference/engine.py.
-  E5  Outputs (paper_figs/case_study/): marginal-utility figures, corner plot,
-      full RAI / PWI supplementary tables (S.1-S.4), FTRL parameter tables,
-      ranking tables with DISPLAY scaling U(a)/U_max*100 (U_max = utility of
-      the ideal alternative scoring 100 on every criterion, i.e. the sum of
-      all piece weights), and a long-format CSV dump.
-  E6  RAI / PWI mirror experiments/metrics.py calc_rai / calc_poi exactly
-      (only the first n_params components of each posterior draw are used;
-      PWI[a,b] = fraction of draws with U(a) >= U(b), hence diagonal = 100).
+Paper:   Sec. 6: Figures 7-8, Tables 5-10 and Supplementary Tables C.1-C.8; the posterior
+         medians, 90% intervals and FTRL-DOR shares quoted in Secs. 6.1-6.2 (stdout)
+Inputs:  none (Table 4 and Figure 6 are embedded constants)
+Outputs: outputs/case_study/, file -> paper item:
+           croner_steps_lin.png          Figure 7     marginals_steps_pw.png        Figure 8
+           table_rank_top5_lin.tex       Table 5      table_rank_top5_pw.tex        Table 8
+           table_rai_evolution_lin.tex   Table 6      table_rai_evolution_pw.tex    Table 9
+           table_pwi_evolution_lin.tex   Table 7      table_pwi_evolution_pw.tex    Table 10
+           table_rai_lin_t1.tex          Table C.1    table_rai_pw_t1.tex           Table C.5
+           table_pwi_lin_t1.tex          Table C.2    table_pwi_pw_t1.tex           Table C.6
+           table_rai_lin_t3.tex          Table C.3    table_rai_pw_t3.tex           Table C.7
+           table_pwi_lin_t3.tex          Table C.4    table_pwi_pw_t3.tex           Table C.8
+         plus four extra outputs that are not in the paper: croner_steps_pw.png (the Figure 7
+         plot for the PW model), ftrl_tables.tex (FTRL-DOR u_j at every breakpoint after each
+         session, raw scale), ranking_tables.tex (full 21-region FTRL-DOR rankings) and
+         case_study_summary.csv (FTRL-DOR and posterior-mean rankings, long format). The
+         'croner' typo is kept on purpose: the manuscript LaTeX includes that file name.
+         stdout: FTRL-DOR rankings, importance shares and PW breakpoint values (FTRL-DOR and
+         posterior median with 90% interval), RAI/PWI summaries of the top-4 regions and the
+         NUTS diagnostics (divergences, max split-Rhat) of every session.
+Runtime: about 1 minute on one CPU core (six NUTS runs of 3000 iterations each)
 
-Feature construction: the paper reports FTRL estimates as U_j evaluated at 0
-and 100 (tab:ftrl_ex_t1 / tab:ftrl_ex_t3), i.e. the breakpoints live on the
-common [0,100] measurement scale, NOT on each column's [min,max] range.  Since
-PiecewiseLinearTransformer.from_equal_intervals uses column min/max, we build
-the transformer through its base constructor with explicit per-criterion
-breakpoints np.linspace(0, 100, gamma_j + 1)  (gamma_j = 1 for T=1, 3 for T=3).
+Usage:
+    python scripts/case_study/case_study_lea.py
 
-Run from the DOR root:
-  C:\\Users\\marco\\anaconda3\\python.exe case_study_lea.py
+Setup (Sec. 6):
+  - e_max = 30 cards (n_max in the code; the largest declared count is 28) and T = 3 sessions,
+    processed as in Algorithm 1 (Sec. 4): after session t both estimators use the 3t
+    adjacent-gap observations (Sec. 3.1) of sessions 1..t, i.e. raw card counts between
+    consecutive regions (expand_subrank(..., expansion='adjacent')), under the likelihood of
+    eq. (11) and the Gamma priors of eq. (14).
+  - Two value-function models on the common [0, 100] scale: LIN, gamma_j = 1 (one weight per
+    criterion), and PW, gamma_j = 3 (breakpoints 0, 33.3, 66.7, 100). The breakpoints come
+    from PiecewiseLinearTransformer.from_equal_intervals applied to Table 4 plus an ideal
+    (100, 100, 100) and an anti-ideal (0, 0, 0) anchor row; the anchors only fix the
+    breakpoints and never enter the observations, the rankings or the indices.
+  - FTRL-DOR = PreferenceSampler.find_map, Gamma(shape 2, scale 1) prior. BAYES-DOR =
+    PreferenceSampler.run_hmc, Gamma(1, 1) prior: 2000 NUTS draws after 1000 warm-up
+    iterations, seed SEED_BASE + t = 20260806 + t for session t (same seeds for LIN and PW).
+  - Normalisation: every draw (and the MAP) is divided by U* = sum_j u_j(100), the value of
+    the ideal alternative (= the sum of all piece weights), so u_j(100) / U* is the importance
+    share of criterion j (Figures 7-8); the ranking tables report U(a) / U* * 100.
+  - RAI[a, r] = share of draws in which region a has rank r (eq. (4)); PWI[a, b] = share of
+    draws with U(a) >= U(b) (eq. (5)), so the diagonal is 100. Same computation as calc_rai /
+    calc_poi of bdor.metrics.BenchmarkRunner. Tables 6, 7, 9 and 10 follow the four regions
+    ranked first by FTRL-DOR after the last session.
+  - The corner plots need the optional 'corner' package (pip install corner). Without it the
+    script still runs, but croner_steps_*.png fall back to a plain-matplotlib version
+    (histograms and scatter clouds, no 90% contours) that does not reproduce Figure 7; no
+    other output depends on it.
+
+(formerly case_study_lea.py at the repository root)
 """
 import sys
 from pathlib import Path
@@ -66,7 +80,7 @@ except ImportError:
     HAVE_CORNER = False
 
 # ----------------------------------------------------------------------------
-# Data (main_EJOR_1.tex, tab:LEA_data) - values in [0, 100], all criteria (up)
+# Data: Table 4 (LEA scores 2024, in [0, 100], all criteria increasing)
 # ----------------------------------------------------------------------------
 REGIONS = [
     "Piedmont",                          # R1
@@ -118,22 +132,22 @@ LEA_TABLE = np.array([
 
 IDX = {name: i for i, name in enumerate(REGIONS)}
 NUM_REGIONS = len(REGIONS)
-CRITERIA = ["Prevention care ($g_1$)", "Primary care ($g_2$)", "Hospital care ($g_3$)"]
-# Row labels of the marginal-utility grid: the panels show the NORMALIZED
-# marginal utility hat{u}_j, so the criterion is named after its function.
+# Row labels of Figure 8: each row shows the normalised marginal value function
+# hat{u}_j of one criterion.
 CRITERIA_HAT = [r"$\hat{u}_1(\cdot)$ (Prevention care)",
                 r"$\hat{u}_2(\cdot)$ (Primary care)",
                 r"$\hat{u}_3(\cdot)$ (Hospital care)"]
 
-# Short display names for the three-column T=3 ranking table (as in the paper).
+# Short region names used in the LaTeX tables (as in the paper).
 SHORT = {
     "Autonomous Province of Bolzano": "A. P. of Bolzano",
     "Autonomous Province of Trento": "A. P. of Trento",
 }
 
 # ----------------------------------------------------------------------------
-# Elicitation sessions (fig:example_t1, fig:example_t3): best -> worst, raw
-# card counts on the consecutive gaps (E2).
+# Elicitation sessions (Figure 6): regions from best to worst; cards[m] is the
+# raw number of blank cards between items[m] and items[m + 1], and each
+# consecutive pair is one gap observation.
 # ----------------------------------------------------------------------------
 STEP_1 = {"items": ["Lombardy", "Marche", "Campania", "Basilicata"],
           "cards": [13, 28, 9]}
@@ -142,24 +156,27 @@ STEP_2 = {"items": ["Emilia Romagna", "Friuli Venezia Giulia", "Campania", "Abru
 STEP_3 = {"items": ["Tuscany", "Lombardy", "Lazio", "Sicily"],
           "cards": [10, 21, 18]}
 
-# Both illustration cases run the SAME three sessions (T = 3, cumulative);
-# they differ only in the marginal utility functions: LIN uses gamma_j = 1
-# (linear), PW uses gamma_j = 3 (piecewise linear, equally spaced breakpoints).
+# Both models (LIN: gamma_j = 1, PW: gamma_j = 3) use the same three sessions,
+# cumulatively; they differ only in the marginal value functions.
 SESSIONS = [STEP_1, STEP_2, STEP_3]
 
-# Protocol cap (Decision 1): e_max = n_max = 30 for both cases (E3).
+# Maximum number of blank cards between two consecutive levels (e_max in the
+# paper, n_max in the engine). The same cap for both models, so both have a
+# threshold vector Delta with 30 components.
 E_MAX = 30
 _all_cards = [c for s in SESSIONS for c in s["cards"]]
 assert max(_all_cards) <= E_MAX, \
     f"declared card count {max(_all_cards)} exceeds the protocol cap e_max={E_MAX}"
 
+# BAYES-DOR: NUTS draws and warm-up iterations per session; the chain after
+# session t uses seed SEED_BASE + t.
 SEED_BASE = 20260806
 NUM_SAMPLES, NUM_WARMUP = 2000, 1000
 
+# Module-level so that a caller can redirect the outputs before calling main().
 OUT_DIR = str(CASE_STUDY_DIR)
 
-# Figure colors: paper convention (captions of fig:example_t1_posterior_sample):
-# blue = BAYES posterior band, red = FTRL (MAP) estimate.
+# Figure 8 colours: blue = BAYES-DOR posterior mean and 90% band, red = FTRL-DOR.
 C_BAYES_FILL = "#1f77b4"
 C_BAYES_LINE = "#1f4fd8"
 C_FTRL = "#d62728"
@@ -169,18 +186,25 @@ C_FTRL = "#d62728"
 # Inference
 # ----------------------------------------------------------------------------
 def build_transformer(gamma):
-    """
-    Paper framework: the evaluation table is augmented with two ANCHOR
-    alternatives -- an ideal one scoring 100 on every criterion and an
-    anti-ideal one scoring 0 -- so that the equal-interval breakpoints span
-    the full [0,100] measurement scale regardless of the observed data range.
-    The anchors are used ONLY here (normalization); they never enter the
-    elicitation data, the rankings, or the RAI/PWI tables.
+    """Piecewise-linear feature map with equal-width breakpoints on [0, 100].
 
-    Since from_equal_intervals takes linspace(min, max, gamma+1) per column,
-    the augmented table yields breakpoints linspace(0, 100, gamma+1) -- i.e.
-    exactly the explicit [0,100] breakpoints this script used before; the two
-    constructions are mathematically identical (asserted below).
+    The evaluation table is augmented with two anchor alternatives, an ideal one
+    scoring 100 on every criterion and an anti-ideal one scoring 0, so that the
+    equal-interval breakpoints of ``from_equal_intervals`` (from each column's
+    min to its max) span the full [0, 100] measurement scale whatever the
+    observed range. The anchors are used only here; they never enter the
+    observations, the rankings or the RAI/PWI tables. The resulting breakpoints
+    are asserted to equal ``np.linspace(0, 100, gamma + 1)`` for every criterion.
+
+    Parameters
+    ----------
+    gamma : int
+        Number of linear pieces per criterion (gamma_j, the same for all j).
+
+    Returns
+    -------
+    PiecewiseLinearTransformer
+        Transformer with 3 * gamma features.
     """
     anchors = np.array([[100.0] * LEA_TABLE.shape[1],
                         [0.0] * LEA_TABLE.shape[1]])
@@ -193,9 +217,33 @@ def build_transformer(gamma):
 
 
 def run_case(case_name, sessions, gamma):
-    """
-    Cumulative inference: after each session, FTRL MAP + BAYES HMC posterior.
-    Returns (transformer, feature_matrix, list of per-step result dicts).
+    """Run the T sessions cumulatively, with FTRL-DOR and BAYES-DOR after each one.
+
+    After session t the sampler holds the adjacent-gap observations of sessions
+    1..t; FTRL-DOR (``find_map``) and BAYES-DOR (``run_hmc``, NUM_SAMPLES draws
+    after NUM_WARMUP warm-up iterations, seed SEED_BASE + t) are fitted on all of
+    them. Prints the gaps, timings and HMC diagnostics of every session.
+
+    Parameters
+    ----------
+    case_name : str
+        Label used in the console output ("LIN" or "PW").
+    sessions : list of dict
+        Sessions with keys "items" (region names, best to worst) and "cards"
+        (blank cards between consecutive items).
+    gamma : int
+        Number of linear pieces per criterion.
+
+    Returns
+    -------
+    transformer : PiecewiseLinearTransformer
+    X : ndarray, shape (21, n_params)
+        Feature matrix of the regions (n_params = 3 * gamma).
+    results : list of dict
+        One dict per session with keys "step" (1-based), "w_map" (FTRL-DOR
+        estimate, shape (n_params + E_MAX,): weights then threshold increments),
+        "samples" (posterior draws, shape (NUM_SAMPLES, n_params + E_MAX)),
+        "diag" (dict with "divergences" and "max_rhat") and "t_hmc" (seconds).
     """
     transformer = build_transformer(gamma)
     X = transformer.transform(LEA_TABLE)
@@ -228,10 +276,27 @@ def run_case(case_name, sessions, gamma):
 
 
 # ----------------------------------------------------------------------------
-# Metrics: exact mirrors of experiments/metrics.py calc_rai / calc_poi (E6)
+# Metrics: same computation as calc_rai / calc_poi of
+# bdor.metrics.BenchmarkRunner (RAI eq. (4), PWI eq. (5))
 # ----------------------------------------------------------------------------
 def calc_rai(f1, t, sam):
-    """RAI[a, r] = fraction of draws in which alternative a occupies rank r (0-based, 0 = best)."""
+    """Rank Acceptability Indices of all alternatives.
+
+    Parameters
+    ----------
+    f1 : int
+        Number of alternatives.
+    t : ndarray, shape (f1, n_params)
+        Feature matrix.
+    sam : ndarray, shape (n_draws, n_params + n_thresholds)
+        Posterior draws; only the first n_params columns (the weights) are used.
+
+    Returns
+    -------
+    ndarray, shape (f1, f1)
+        RAI[a, r] = fraction of draws in which alternative a has rank r
+        (0-based, 0 = best).
+    """
     rank_count = np.zeros((f1, f1))
     sam = np.atleast_2d(sam)
     w = sam[:, :t.shape[1]]
@@ -244,7 +309,11 @@ def calc_rai(f1, t, sam):
 
 
 def calc_pwi(f1, t, sam):
-    """PWI[a, b] = fraction of draws with U(a) >= U(b) (mirror of calc_poi; diagonal = 1)."""
+    """Pairwise Winning Indices of all alternatives (calc_poi in bdor.metrics).
+
+    Same arguments as :func:`calc_rai`. Returns an (f1, f1) array with
+    PWI[a, b] = fraction of draws with U(a) >= U(b); the diagonal is 1.
+    """
     rank_count = np.zeros((f1, f1))
     sam = np.atleast_2d(sam)
     w = sam[:, :t.shape[1]]
@@ -256,10 +325,21 @@ def calc_pwi(f1, t, sam):
 
 
 def scaled_utilities(X, w):
-    """
-    Display scaling (plan E5): U_disp(a) = U(a) / U_max * 100, where
-    U_max = sum of all piece weights = utility of the ideal alternative that
-    scores 100 on every criterion (all features saturate at 1).
+    """Display-scaled utilities U(a) / U_max * 100 of all alternatives.
+
+    U_max is the sum of all piece weights, i.e. the utility of the ideal
+    alternative that scores 100 on every criterion (all its features equal 1).
+
+    Parameters
+    ----------
+    X : ndarray, shape (n_alternatives, n_params)
+        Feature matrix.
+    w : array_like, shape (>= n_params,)
+        Parameter vector; only the first n_params entries (the weights) are used.
+
+    Returns
+    -------
+    ndarray, shape (n_alternatives,)
     """
     n_params = X.shape[1]
     w = np.asarray(w)[:n_params]
@@ -267,7 +347,11 @@ def scaled_utilities(X, w):
 
 
 def bayes_mean_scaled_utilities(X, samples):
-    """Posterior mean of the per-draw display-scaled utilities."""
+    """Posterior mean of the per-draw display-scaled utilities.
+
+    ``samples`` has shape (n_draws, >= n_params); each draw is scaled as in
+    :func:`scaled_utilities` before averaging. Returns shape (n_alternatives,).
+    """
     n_params = X.shape[1]
     w = samples[:, :n_params]
     vals = (X @ w.T) / np.sum(w, axis=1)[None, :] * 100.0
@@ -278,74 +362,44 @@ def bayes_mean_scaled_utilities(X, samples):
 # Figures
 # ----------------------------------------------------------------------------
 def criterion_features(bp, x_grid):
-    """Feature block of one criterion on a grid (same clipping as the transformer)."""
+    """Feature block of one criterion on a grid (same clipping as the transformer).
+
+    Parameters
+    ----------
+    bp : ndarray, shape (n_pieces + 1,)
+        Breakpoints of the criterion.
+    x_grid : ndarray, shape (n_grid,)
+        Criterion values.
+
+    Returns
+    -------
+    ndarray, shape (n_grid, n_pieces)
+        Piece activations clip((x - bp[k]) / (bp[k + 1] - bp[k]), 0, 1).
+    """
     n_seg = len(bp) - 1
     return np.stack([np.clip((x_grid - bp[k]) / (bp[k + 1] - bp[k]), 0.0, 1.0)
                      for k in range(n_seg)], axis=1)
 
 
-def plot_utilities(transformer, w_map, samples, out_path):
-    """
-    Three panels (one per criterion): BAYES posterior mean and 90% pointwise
-    credible band (blue) + FTRL MAP estimate (red), x in [0, 100].
-
-    Utilities are NORMALIZED PER DRAW by the total weight sum, i.e. the curves
-    show U_j(x) / U_max with U_max = U(ideal alternative scoring 100 on every
-    criterion) = sum of all piece weights.  The value at x = 100 is therefore
-    the criterion importance share hat{w}_j of the corner plots, and the three
-    panel endpoints sum to 1 in every draw.  Rationale: the raw scale of w is
-    shared with the thresholds Delta and is only weakly identified by a few
-    sessions, so raw-scale bands conflate irrelevant scale uncertainty with
-    the shape/share uncertainty that actually drives the rankings and the
-    RAI/PWI tables (the raw-scale band was ~[0, 4] around a mean of ~1.3).
-    """
-    m = transformer.num_criteria
-    n_params = transformer.total_params
-    col_end = np.cumsum(transformer.n_w)
-    col_start = np.insert(col_end[:-1], 0, 0)
-    x_grid = np.linspace(0.0, 100.0, 201)
-
-    w_draws = samples[:, :n_params]
-    tot_draws = w_draws.sum(axis=1)                       # (n_draws,)
-    w_map = np.asarray(w_map)[:n_params]
-    tot_map = np.sum(w_map)
-
-    plt.rcParams.update({"font.size": 13})
-    fig, axes = plt.subplots(1, m, figsize=(4.6 * m, 4.2), sharey=True)
-    for j in range(m):
-        ax = axes[j]
-        bp = np.asarray(transformer.ch_p[j], dtype=float)
-        F = criterion_features(bp, x_grid)
-        s, e = int(col_start[j]), int(col_end[j])
-
-        curves = (F @ w_draws[:, s:e].T) / tot_draws[None, :]   # (n_grid, n_draws)
-        y_lo = np.percentile(curves, 5, axis=1)
-        y_hi = np.percentile(curves, 95, axis=1)
-        ax.fill_between(x_grid, y_lo, y_hi, color=C_BAYES_FILL, alpha=0.25,
-                        linewidth=0, label="BAYES 90% credible band")
-        ax.plot(x_grid, curves.mean(axis=1), color=C_BAYES_LINE, lw=2,
-                label="BAYES posterior mean")
-        ax.plot(x_grid, F @ w_map[s:e] / tot_map, color=C_FTRL, lw=2,
-                label="FTRL (MAP)")
-
-        ax.set_title(CRITERIA[j])
-        ax.set_xlabel("Criterion value")
-        if j == 0:
-            ax.set_ylabel("Normalized marginal utility")
-            ax.legend(fontsize=10, loc="upper left", framealpha=0.95)
-        ax.set_xlim(0, 100)
-        ax.set_ylim(bottom=0)
-        ax.grid(True, alpha=0.3)
-        ax.set_axisbelow(True)
-    plt.tight_layout()
-    plt.savefig(out_path, dpi=200)
-    plt.close()
-
-
 def criterion_totals(samples, n_params, group_sizes):
-    """Per-draw RAW per-criterion totals U_j(100) = sum of that criterion's
-    piece weights.  No normalization: this is the same scale as the FTRL
-    parameter tables (for gamma_j = 1, U_j(100) is the weight w_j itself)."""
+    """Raw per-criterion totals u_j(100) = sum of that criterion's piece weights.
+
+    No normalisation (callers divide by the row sum where needed); for
+    gamma_j = 1, u_j(100) is the weight w_j itself.
+
+    Parameters
+    ----------
+    samples : ndarray, shape (n_draws, >= n_params) or (>= n_params,)
+        Posterior draws or a single parameter vector (treated as one draw).
+    n_params : int
+        Number of weights (leading entries of each draw).
+    group_sizes : sequence of int
+        Number of pieces per criterion (``transformer.n_w``).
+
+    Returns
+    -------
+    ndarray, shape (n_draws, n_criteria)
+    """
     w = np.atleast_2d(samples)[:, :n_params]
     idx = np.cumsum([0] + list(group_sizes))
     return np.stack([w[:, idx[j]:idx[j + 1]].sum(axis=1)
@@ -353,17 +407,32 @@ def criterion_totals(samples, n_params, group_sizes):
 
 
 def plot_corner_steps(results, transformer, out_path, axis_labels):
-    """
-    Single corner plot of the per-criterion utilities U_j(100) (the sum of
-    that criterion's piece weights) NORMALIZED per draw by
-    U_max = sum_l U_l(100) = the utility of the ideal alternative scoring 100
-    on every criterion.  With this normalization U(ideal) = 1, the plotted
-    U_j(100) are the criterion importance shares and sum to 1 in every draw;
-    they are the ranking-relevant quantity.  One color per
-    session (matplotlib default cycle: blue T=1, orange T=2, green T=3),
-    with the FTRL MAP estimate of each session overlaid (dashed vertical
-    line on the diagonal panels, X marker on the bivariate panels).  2-D
-    panels show the 90% credible contour only; every panel has a grid.
+    """Corner plot of the importance shares after every session (Figure 7).
+
+    Plots the per-criterion totals u_j(100) (sum of that criterion's piece
+    weights) normalised per draw by U_max = sum_l u_l(100), the utility of the
+    ideal alternative scoring 100 on every criterion. With this normalisation
+    U(ideal) = 1 and the plotted u_j(100) are the criterion importance shares,
+    which sum to 1 in every draw. One colour per session (blue T=1, orange
+    T=2, green T=3), with the FTRL-DOR estimate of each session overlaid
+    (dashed vertical line on the diagonal panels, X marker on the bivariate
+    panels). The 2-D panels show the 90% credible contour only.
+
+    Parameters
+    ----------
+    results : list of dict
+        Output of :func:`run_case` (uses "step", "samples" and "w_map").
+    transformer : PiecewiseLinearTransformer
+    out_path : str
+        PNG file to write (200 dpi).
+    axis_labels : list of str
+        One axis label per criterion.
+
+    Notes
+    -----
+    Uses ``corner.corner`` when the optional ``corner`` package is installed,
+    otherwise a plain-matplotlib fallback (step histograms and scatter clouds)
+    that does not reproduce the paper figure.
     """
     n_params, sizes = transformer.total_params, transformer.n_w
     totals = [criterion_totals(r["samples"], n_params, sizes) for r in results]
@@ -417,7 +486,8 @@ def plot_corner_steps(results, transformer, out_path, axis_labels):
         fig.savefig(out_path, dpi=200)
         plt.close(fig)
         return
-    # Pure-matplotlib fallback: overlaid density hists / scatter, same overlays.
+    # Fallback without the 'corner' package: overlaid density histograms and
+    # scatter clouds with the same FTRL-DOR overlays (not the paper figure).
     fig, axes = plt.subplots(k, k, figsize=(3.0 * k, 3.0 * k))
     for i in range(k):
         for j in range(k):
@@ -451,15 +521,28 @@ def plot_corner_steps(results, transformer, out_path, axis_labels):
 
 
 def plot_marginals_steps(results, transformer, out_path):
-    """
-    Grid of NORMALIZED marginal utility functions: rows = criteria, columns =
-    sessions (T = 1..3).  Each panel shows the BAYES posterior mean with its
-    90% pointwise credible band (blue) and the FTRL MAP estimate (red) of
-    u_j(x)/U_max, with U_max = utility of the ideal alternative (per-draw
-    normalization, as in the corner plots; the value at x = 100 is the
-    criterion importance share).  Panels in a row SHARE the y-axis, so
-    reading a row left to right shows how that marginal utility evolves and
-    its band narrows as the sessions accumulate.
+    """Grid of normalised marginal value functions (Figure 8).
+
+    Rows = criteria, columns = sessions (T = 1..3). Each panel shows the
+    BAYES-DOR posterior mean with its 90% pointwise credible band (blue) and
+    the FTRL-DOR estimate (red) of u_j(x) / U_max on x in [0, 100], with U_max
+    the utility of the ideal alternative (per-draw normalisation, as in
+    :func:`plot_corner_steps`; the value at x = 100 is the criterion importance
+    share). Panels in a row share the y-axis, so a row read left to right shows
+    how that marginal value function evolves as the sessions accumulate.
+
+    Parameters
+    ----------
+    results : list of dict
+        Output of :func:`run_case` (uses "step", "samples" and "w_map").
+    transformer : PiecewiseLinearTransformer
+    out_path : str
+        PNG file to write (200 dpi).
+
+    Notes
+    -----
+    Sets the global ``font.size`` rcParam to 17, which also applies to every
+    figure drawn afterwards; main() therefore draws this figure last.
     """
     m = transformer.num_criteria
     n_params = transformer.total_params
@@ -507,58 +590,6 @@ def plot_marginals_steps(results, transformer, out_path):
     plt.close()
 
 
-def plot_corner(samples, n_params, out_path, group_sizes=None):
-    """
-    Corner plot of the posterior weights, NORMALIZED per draw to shares
-    hat{w}_i = w_i / sum_j w_j (the convention of the paper's Figure 5: axes in
-    [0,1], bivariate support inside the simplex triangle).  The overall scale
-    of w is shared with the thresholds and is not what the figure is meant to
-    show; the shares are the ranking-relevant quantity.
-
-    group_sizes: piece counts per criterion (transformer.n_w).  When given,
-    piece weights are summed within each criterion first, so the plot shows
-    the CRITERION importance shares hat{w}_j = U_j(100)/sum_l U_l(100) --
-    the gamma_j > 1 counterpart of the T=1 plot (used for the T=3 case).
-    """
-    w = samples[:, :n_params]
-    if group_sizes is not None:
-        idx = np.cumsum([0] + list(group_sizes))
-        w = np.stack([w[:, idx[j]:idx[j + 1]].sum(axis=1)
-                      for j in range(len(group_sizes))], axis=1)
-    w = w / w.sum(axis=1, keepdims=True)
-    labels = [r"$\hat{w}_1$", r"$\hat{w}_2$", r"$\hat{w}_3$"]
-    if HAVE_CORNER:
-        fig = corner_pkg.corner(w, labels=labels, show_titles=True,
-                                quantiles=[0.05, 0.5, 0.95],
-                                range=[(0, 1)] * w.shape[1],
-                                title_fmt=".3f", color=C_BAYES_FILL)
-        fig.savefig(out_path, dpi=200)
-        plt.close(fig)
-        return
-    # Pure-matplotlib fallback: marginal hists on the diagonal, scatter below.
-    k = w.shape[1]
-    fig, axes = plt.subplots(k, k, figsize=(3.0 * k, 3.0 * k))
-    for i in range(k):
-        for j in range(k):
-            ax = axes[i, j]
-            if j > i:
-                ax.axis("off")
-            elif i == j:
-                ax.hist(w[:, i], bins=40, color=C_BAYES_FILL, alpha=0.8)
-                ax.set_yticks([])
-            else:
-                ax.scatter(w[:, j], w[:, i], s=3, alpha=0.15, color=C_BAYES_FILL)
-            if i == k - 1:
-                ax.set_xlabel(labels[j])
-            else:
-                ax.set_xticklabels([])
-            if j == 0 and i > 0:
-                ax.set_ylabel(labels[i])
-    plt.tight_layout()
-    plt.savefig(out_path, dpi=200)
-    plt.close()
-
-
 # ----------------------------------------------------------------------------
 # LaTeX tables (booktabs style, percentages with 1 decimal like the paper)
 # ----------------------------------------------------------------------------
@@ -573,6 +604,17 @@ def fmt_pct(v):
 
 
 def write_rai_table(rai, path, caption, label):
+    """Write the full 21 x 21 RAI table (Tables C.1, C.3, C.5, C.7).
+
+    Parameters
+    ----------
+    rai : ndarray, shape (21, 21)
+        Output of :func:`calc_rai` (rows = regions R1..R21, columns = ranks).
+    path : str
+        .tex file to write.
+    caption, label : str
+        LaTeX caption and label.
+    """
     cols = "X|" + "C" * NUM_REGIONS
     lines = [
         "\\begin{table}[h!]",
@@ -596,7 +638,12 @@ def write_rai_table(rai, path, caption, label):
 
 
 def write_pwi_table(pwi, path, caption, label):
-    # Diagonal is 100 by the U(a) >= U(b) convention of calc_poi (E6).
+    """Write the full 21 x 21 PWI table (Tables C.2, C.4, C.6, C.8).
+
+    ``pwi`` is the output of :func:`calc_pwi` (entry [a, b] = share of draws
+    with U(a) >= U(b), so the diagonal is 100); other arguments as in
+    :func:`write_rai_table`.
+    """
     cols = "X|" + "C" * NUM_REGIONS
     lines = [
         "% PWI[a,b] = fraction of posterior draws with U(a) >= U(b);",
@@ -620,9 +667,11 @@ def write_pwi_table(pwi, path, caption, label):
 
 
 def utilities_at_breakpoints(transformer, w_map):
-    """
-    Per criterion, U_j at each breakpoint = cumulative sum of the piece weights
-    (U_j(bp_0) = 0), as reported in the paper's tab:ftrl_ex_t3.
+    """Raw marginal values u_j at every breakpoint, for each criterion.
+
+    u_j at the breakpoints is the cumulative sum of the piece weights, with
+    u_j(bp_0) = 0. Returns a list with one array of length n_pieces_j + 1 per
+    criterion (used for ftrl_tables.tex).
     """
     col_end = np.cumsum(transformer.n_w)
     col_start = np.insert(col_end[:-1], 0, 0)
@@ -634,14 +683,24 @@ def utilities_at_breakpoints(transformer, w_map):
 
 
 def fmt_bp(x):
+    """Breakpoint label: integer if whole, else one decimal (33.3, 66.7)."""
     return f"{x:.0f}" if abs(x - round(x)) < 1e-9 else f"{x:.1f}"
 
 
 def write_ftrl_tables(lin, pw, path):
-    """
-    LIN table: one row per session, U_j(0) and U_j(100) (linear utilities).
-    PW table: one row per session, U_j at every breakpoint (gamma_j = 3).
-    Raw parameter scale in both (same scale as the corner plots).
+    """Write the FTRL-DOR parameter tables of both models (ftrl_tables.tex).
+
+    LIN table: one row per session, u_j(0) and u_j(100). PW table: one row per
+    session, u_j at every breakpoint (gamma_j = 3). Both on the raw parameter
+    scale, i.e. not normalised by U_max as in Figures 7-8. Not in the paper.
+
+    Parameters
+    ----------
+    lin, pw : tuple
+        (transformer, results) of the LIN and PW models, ``results`` as
+        returned by :func:`run_case`.
+    path : str
+        .tex file to write.
     """
     tr_lin, res_lin = lin
     tr_pw, res_pw = pw
@@ -703,7 +762,10 @@ def ranking_from_utilities(u_disp):
 
 
 def cumulative_reference_sets():
-    """Reference alternatives seen up to and including each session."""
+    """Reference alternatives seen up to and including each session.
+
+    Returns a list with one set of region indices per session of SESSIONS.
+    """
     refs, acc = [], set()
     for sess in SESSIONS:
         acc |= {IDX[n] for n in sess["items"]}
@@ -712,8 +774,28 @@ def cumulative_reference_sets():
 
 
 def ranking_table_lines(X, res_list, caption, label, top_n=None):
-    """Three-column-group FTRL ranking table, one group per session.
-    top_n limits the table to the first top_n positions of each session."""
+    """LaTeX lines of an FTRL-DOR ranking table, one column group per session.
+
+    Each group lists the regions by decreasing display-scaled utility
+    (:func:`scaled_utilities`); the reference alternatives seen up to that
+    session are in bold.
+
+    Parameters
+    ----------
+    X : ndarray, shape (21, n_params)
+        Feature matrix.
+    res_list : list of dict
+        Output of :func:`run_case` (uses "w_map").
+    caption, label : str
+        LaTeX caption and label.
+    top_n : int, optional
+        Keep only the first top_n positions (Tables 5 and 8 use 5); all 21
+        regions by default.
+
+    Returns
+    -------
+    list of str
+    """
     refs_steps = cumulative_reference_sets()
     rankings = [ranking_from_utilities(scaled_utilities(X, res["w_map"]))
                 for res in res_list]
@@ -746,17 +828,25 @@ def ranking_table_lines(X, res_list, caption, label, top_n=None):
 
 
 def write_ranking_tables(lin, pw, path):
-    """
-    FTRL ranking after each session for both cases (linear / piecewise).
-    Reference alternatives in bold (cumulative).  Display scaling (plan E5):
-    U_disp(a) = U(a)/U_max*100 with U_max the utility of the ideal alternative
-    scoring 100 on every criterion.
+    """Write the full FTRL-DOR rankings of both models (ranking_tables.tex).
+
+    One table per model, one column group per session, reference alternatives
+    in bold (cumulative); utilities are U(a) / U_max * 100 with U_max the
+    utility of the ideal alternative scoring 100 on every criterion. Not in the
+    paper (Tables 5 and 8 are the top-5 versions).
+
+    Parameters
+    ----------
+    lin, pw : tuple
+        (transformer, X, results) of the LIN and PW models.
+    path : str
+        .tex file to write.
     """
     _, X_lin, res_lin = lin
     _, X_pw, res_pw = pw
     lines = [
         "% FTRL-DOR rankings for the LEA case study (adjacent-only likelihood,",
-        "% e_max = n_max = 30).  Display scaling (plan E5):",
+        "% e_max = n_max = 30).  Display scaling:",
         "% U_disp(a) = U(a) / U_max * 100, U_max = sum of all piece weights",
         "% (utility of the ideal alternative scoring 100 on every criterion).",
         "",
@@ -784,14 +874,27 @@ def write_ranking_tables(lin, pw, path):
 
 def write_rai_evolution_table(rai_steps, top_idx, path, caption, label,
                               max_rank=8):
-    """
-    RAI evolution for the top-ranked regions: one block of three rows
-    (T = 1, 2, 3) per region, columns = ranks 1..max_rank plus the aggregated
-    tail; shows how the rank distributions sharpen across sessions.
+    """Write the RAI evolution of the top-ranked regions (Tables 6 and 9).
+
+    One block of three rows (T = 1, 2, 3) per region; columns = ranks
+    1..max_rank plus the aggregated tail ">max_rank".
+
+    Parameters
+    ----------
+    rai_steps : list of ndarray, shape (21, 21)
+        RAI matrix after each session.
+    top_idx : list of int
+        Region indices, in display order.
+    path : str
+        .tex file to write.
+    caption, label : str
+        LaTeX caption and label.
+    max_rank : int, default 8
+        Last rank shown individually.
     """
     cols = "l l|" + "C" * max_rank + "C"
     lines = [
-        f"\\begin{{table}}[h!]",
+        "\\begin{table}[h!]",
         "\\centering",
         "\\footnotesize",
         f"\\caption{{{caption}}}",
@@ -821,10 +924,12 @@ def write_rai_evolution_table(rai_steps, top_idx, path, caption, label,
 
 
 def write_pwi_evolution_table(pwi_steps, top_idx, path, caption, label):
-    """
-    PWI among the top-ranked regions after each session: rows = regions,
-    one column group per session with the PWI against each of the same
-    regions ('--' on the diagonal).
+    """Write the PWI among the top-ranked regions after each session (Tables 7 and 10).
+
+    Rows = regions, one column group per session with the PWI against each of
+    the same regions ('--' on the diagonal). ``pwi_steps`` is a list of
+    (21, 21) PWI matrices, one per session; other arguments as in
+    :func:`write_rai_evolution_table`.
     """
     k = len(top_idx)
     cols = "l|" + "|".join("C" * k for _ in pwi_steps)
@@ -861,6 +966,7 @@ def write_pwi_evolution_table(pwi_steps, top_idx, path, caption, label):
 # Main
 # ----------------------------------------------------------------------------
 def main():
+    """Fit both models, write every output to OUT_DIR and print the console report."""
     t_start = time.perf_counter()
     os.makedirs(OUT_DIR, exist_ok=True)
 
@@ -874,10 +980,10 @@ def main():
     print("\n--- Case PW (gamma_j = 3, T=3 cumulative) ---")
     tr_pw, X_pw, res_pw = run_case("PW", SESSIONS, gamma=3)
 
-    # --- corner figures (raw scale, FTRL overlays, one per case) -------------
-    # Paper notation (Section 2): lowercase u_j for the MARGINAL value
-    # functions; capital U(a) is reserved for the global utility.  The hat
-    # marks the per-draw normalization by the ideal alternative's utility.
+    # --- figures: corner plots (Figure 7 = LIN; PW extra) and Figure 8 -------
+    # Paper notation (Section 2): lowercase u_j for the marginal value
+    # functions, capital U(a) for the global value; the hat marks the per-draw
+    # normalisation by the ideal alternative's utility.
     labels_u = [r"$\hat{u}_1(100)$", r"$\hat{u}_2(100)$", r"$\hat{u}_3(100)$"]
     plot_corner_steps(res_lin, tr_lin,
                       os.path.join(OUT_DIR, "croner_steps_lin.png"), labels_u)
@@ -892,9 +998,8 @@ def main():
     rai_pw = [calc_rai(NUM_REGIONS, X_pw, r["samples"]) for r in res_pw]
     pwi_pw = [calc_pwi(NUM_REGIONS, X_pw, r["samples"]) for r in res_pw]
 
-    # Supplementary tables: full 21-region RAI/PWI after the FIRST and after
-    # the THIRD session of each case -- the section compares T=1 with T=3, so
-    # both posteriors need to be documented (not only the final one).
+    # Supplementary Tables C.1-C.8: full 21-region RAI/PWI after the first and
+    # after the third session of each model (Section 6 compares T=1 with T=3).
     for tag, desc, sec_ref, rai_steps, pwi_steps in [
             ("lin", "linear marginal utility functions",
              "sec:example_linear", rai_lin, pwi_lin),
@@ -916,7 +1021,8 @@ def main():
                 f"the posterior distribution after {when}, with {desc} "
                 f"(Section \\ref{{{sec_ref}}})", f"tab:PWI_{tag}_t{t}")
 
-    # --- RAI / PWI evolution across sessions for the top-4 regions -----------
+    # --- Tables 6, 7, 9, 10: RAI / PWI evolution for the top-4 regions -------
+    # The four regions ranked first by FTRL-DOR after the last session.
     rank_final_lin = ranking_from_utilities(
         scaled_utilities(X_lin, res_lin[-1]["w_map"]))
     top4_lin = [idx for idx, _ in rank_final_lin[:4]]
@@ -950,13 +1056,13 @@ def main():
         "(\\%) among the four top-ranked regions, in the case of piecewise "
         "linear marginal utility functions ($\\gamma_j=3$)", "tab:pwi_evo_pw")
 
-    # --- FTRL parameter and ranking tables -----------------------------------
+    # --- FTRL-DOR parameter and full ranking tables (not in the paper) -------
     write_ftrl_tables((tr_lin, res_lin), (tr_pw, res_pw),
                       os.path.join(OUT_DIR, "ftrl_tables.tex"))
     write_ranking_tables((tr_lin, X_lin, res_lin), (tr_pw, X_pw, res_pw),
                          os.path.join(OUT_DIR, "ranking_tables.tex"))
-    # Compact top-5 FTRL ranking for the linear subsection (the five regions
-    # its RAI/PWI discussion refers to), one column group per session.
+    # Tables 5 (LIN) and 8 (PW): top-5 FTRL-DOR ranking, one column group per
+    # session.
     top5 = ranking_table_lines(
         X_lin, res_lin,
         "The five highest-scoring regions after each of the $T=3$ sessions, "
@@ -981,7 +1087,7 @@ def main():
     with open(os.path.join(OUT_DIR, "table_rank_top5_pw.tex"), "w") as f:
         f.write("\n".join(top5_pw) + "\n")
 
-    # --- long-format CSV dump -------------------------------------------------
+    # --- case_study_summary.csv: FTRL-DOR and posterior-mean rankings -------
     rows = []
     for case_name, X, res_list in [("LIN", X_lin, res_lin),
                                    ("PW", X_pw, res_pw)]:
@@ -996,7 +1102,7 @@ def main():
     pd.DataFrame(rows).to_csv(os.path.join(OUT_DIR, "case_study_summary.csv"),
                               index=False)
 
-    # --- console report -------------------------------------------------------
+    # --- console report (source of the numbers quoted in Secs. 6.1-6.2) ------
     print("\n" + "=" * 72)
     for case_name, X, res_list in [("LIN", X_lin, res_lin),
                                    ("PW", X_pw, res_pw)]:
@@ -1009,12 +1115,14 @@ def main():
                                for s in range(len(ranks)))
             print(f"  {r + 1:2d}. {cells}")
 
-    # Sanity check (E1/E2): the session-1 reference order must be respected.
+    # Sanity check: the FTRL-DOR LIN ranking after session 1 respects the order
+    # declared in session 1.
     rank_s1 = ranking_from_utilities(scaled_utilities(X_lin, res_lin[0]["w_map"]))
     pos = {idx: r for r, (idx, _) in enumerate(rank_s1)}
     ref_order = [IDX[n] for n in STEP_1["items"]]
     assert all(pos[ref_order[i]] < pos[ref_order[i + 1]] for i in range(3)), \
-        "FTRL LIN T=1 ranking violates the reference order Lombardy > Marche > Campania > Basilicata"
+        ("FTRL LIN T=1 ranking violates the reference order "
+         "Lombardy > Marche > Campania > Basilicata")
     print("\n  [check] reference order Lombardy > Marche > Campania > Basilicata respected")
 
     print("\nRaw totals U_j(100): FTRL / BAYES median [5%, 95%]:")
@@ -1085,8 +1193,10 @@ def main():
             print(f"  {case_name:<4s} {res['step']}   {u_max_ftrl:9.4f}   "
                   f"{q[1]:7.3f} [{q[0]:6.3f}, {q[2]:7.3f}]   "
                   f"{norm:10.1f}   {disp:7.1f}")
+    max_disp = max(scaled_utilities(X_lin, res_lin[-1]['w_map']).max(),
+                   scaled_utilities(X_pw, res_pw[-1]['w_map']).max())
     print("  (every real region scores below the ideal: max display utility "
-          f"{max(scaled_utilities(X_lin, res_lin[-1]['w_map']).max(), scaled_utilities(X_pw, res_pw[-1]['w_map']).max()):.2f})")
+          f"{max_disp:.2f})")
 
     for case_name, rai_steps, pwi_steps, top4 in [
             ("LIN", rai_lin, pwi_lin, top4_lin),

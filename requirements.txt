@@ -1,5 +1,6 @@
 # Exact versions that produced the results in the paper (Python 3.11.9, Windows 11, CPU).
-# Newer versions should work, but JAX/NumPyro updates can change Monte Carlo draws.
+# These pins install on Python 3.11 and 3.12 only; on other versions use `pip install -e .`
+# (current versions; JAX/NumPyro updates can change the Monte Carlo draws).
 numpy==1.26.4
 scipy==1.17.1
 pandas==2.2.2

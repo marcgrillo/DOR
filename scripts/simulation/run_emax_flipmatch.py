@@ -1,27 +1,32 @@
-"""
-Flip-matched e_max control (2026-08-17, follow-up to compare_emax.py).
+"""Noise-scaled control of the e_max study at Finc = 50%: sigma held fixed on the utility scale.
 
-The card-matched injection of compare_emax.py holds P(exact card) fixed given
-e_max, which at e_max=50 all but removes ordinal noise (realized adjacent
-flips at Inc=50: 21.0% for e_max=5 vs 3.5% for e_max=50). This control
-matches the ORDINAL noise instead: sigma is tuned on the e_max=5 scale
-(bit-identically to the Inc=50/Emax=5 fold, same calibration RNG stream) and
-scaled by e_max/5, i.e. held fixed on the utility axis. With the same
-generation seed the noisy perceived utilities are IDENTICAL up to the x10
-scale factor, so the declared orders -- and hence the 21.0% realized adjacent
-flip rate -- match the e_max=5 fold run-by-run; only the card grid is finer.
+run_emax_study.py tunes sigma per e_max on the card scale, so at Finc = 50 its e_max = 50 fold
+reverses far fewer adjacent pairs than the e_max = 5 one (3.5% vs 21.0%). This script adds the
+fold ..._Inc=50_Emax=50_Sigma=util, with sigma tuned at e_max = 5 and multiplied by 10
+(= e_max / 5): its declared orders equal those of the e_max = 5 fold (verify() asserts it) and
+only the card grid is finer. Run run_emax_study.py first (its folds and constants are reused).
+Resumable: datasets and per-session sample files are reused; metrics are recomputed (force=True).
 
-Comparisons (Inc=50 variants share the same 10 tables -> paired Wilcoxon):
-  e_max=50 flip-matched vs e_max=5              pure granularity under REAL ordinal noise
-  e_max=50 flip-matched vs e_max=50 card-matched size of the injection artifact
-  Inc=0 folds shown as no-inconsistency reference (different tables, unpaired).
+Paper:   Sec. 5.4, noise-scaled control (sigma of eq. (21) times ten): ASR gain and paired
+         Wilcoxon p-value of e50_flip over e5_inc50 at T = 10
+Inputs:  data/datasets/emax_F1=10_F2=3_S=10_AR=3_K=3_Inc=50_Emax=5/ and the data/metrics/
+         files of the four emax_* folds with Finc in {0, 50}, all written by run_emax_study.py
+Outputs: results/emax_flipmatch.csv, outputs/diagnostics/emax/emax_flipmatch.png;
+         stdout: pairing check, final-session means and paired Wilcoxon tests;
+         data/{datasets,samples,metrics}/emax_F1=10_F2=3_S=10_AR=3_K=3_Inc=50_Emax=50_Sigma=util/
+Runtime: about 11 min from scratch, one process on a desktop CPU (BAYES-DOR about 9 min);
+         about a minute when the sample files exist.
 
-Run:  C:\\Users\\marco\\anaconda3\\python.exe compare_emax_flipmatch.py   (from DOR/)
+Usage:
+    python scripts/simulation/run_emax_flipmatch.py
+
+(formerly compare_emax_flipmatch.py)
 """
 import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))  # repo root, so `import bdor` works without installing
 import os
+import csv
 import json
 import time
 import numpy as np
@@ -36,15 +41,25 @@ from bdor.metrics import BenchmarkRunner
 from bdor.utils import parse_subfold_string
 import bdor.utils as utils
 from bdor.paths import DATASETS_DIR, RESULTS_DIR, DIAGNOSTICS_DIR
+# Sibling script (importable because Python puts this script's folder on sys.path): design
+# constants, seeds, fold names and plot colours of the e_max study.
 from run_emax_study import (F1, F2, STEPS, AR, K, HM, GEN_SEED, RUN_SEED, ARMS,
-                          METRICS, fold_name, INK, INK2, MUTED, GRID, SURFACE)
+                            METRICS, fold_name, INK, INK2, MUTED, GRID, SURFACE)
 
 INC = 50
 FM_FOLD = f"emax_F1={F1}_F2={F2}_S={STEPS}_AR={AR}_K={K}_Inc={INC}_Emax=50_Sigma=util"
 OUT_DIR = os.path.join(DIAGNOSTICS_DIR, 'emax')
 CSV_PATH = os.path.join(RESULTS_DIR, 'emax_flipmatch.csv')
 
-# variant -> (dataset fold, eta_max)
+# Compared variants: variant -> (dataset fold, eta_max). The three Finc = 50 variants share
+# tables, true utilities and noise draws (same seed), so they are compared pairwise:
+#   e5_inc50   e_max = 5                                     21.0% reversed adjacent pairs
+#   e50_card   e_max = 50, card-matched sigma                 3.5%
+#   e50_flip   e_max = 50, sigma fixed on the utility axis   21.0%, same orders as e5_inc50
+# e50_flip vs e5_inc50 isolates the finer card grid under the same ordinal noise (the
+# comparison reported in the paper); e50_flip vs e50_card shows how much of the card-matched
+# gain comes from the lower noise. The two Finc = 0 folds are a noise-free reference (other
+# tables, not paired with the rest).
 VARIANTS = {
     'e5_inc50': (fold_name(INC, 5), 5),
     'e50_card': (fold_name(INC, 50), 50),
@@ -56,12 +71,19 @@ PAIRED = ['e5_inc50', 'e50_card', 'e50_flip']  # same seed -> same tables
 
 
 class UtilityScaleSigmaGenerator(DatasetGenerator):
-    """sigma tuned on the e_max=5 scale, then scaled by n_max/5 (fixed on the
-    utility axis). The parent tuner is called with n_max=5 so the calibration
-    consumes the identical RNG stream as the e_max=5 fold (pairing)."""
+    """DatasetGenerator whose noise scale is fixed on the utility axis, not on the card axis.
+
+    ``_tune_sigma`` solves eq. (22) on the e_max = 5 scale and multiplies the solution by
+    ``n_max / 5``. The parent tuner is called with ``n_max=5``, so the calibration consumes the
+    same random numbers as for the e_max = 5 fold and returns the same sigma. With the same
+    seed, the perceived utilities of eq. (21) are then ``n_max / 5`` times those of the
+    e_max = 5 fold (up to floating-point rounding): the declared orders coincide and only the
+    card grid is finer.
+    """
 
     def _tune_sigma(self, f1, f2, target_consistency, n_max, num_intervals=3,
                     utility_type='exponential'):
+        """Return the e_max = 5 solution of eq. (22) times ``n_max / 5`` (0 if consistent)."""
         sigma5 = super()._tune_sigma(f1, f2, target_consistency, 5,
                                      num_intervals=num_intervals,
                                      utility_type=utility_type)
@@ -69,6 +91,10 @@ class UtilityScaleSigmaGenerator(DatasetGenerator):
 
 
 def generate():
+    """Generate the flip-matched dataset, unless it already exists.
+
+    Uses the seed of both Finc = 50 folds of run_emax_study.py (``GEN_SEED + 50``).
+    """
     json_path = os.path.join(DATASETS_DIR, FM_FOLD, f"f1_{F1}__f2_{F2}__nsteps_{STEPS}.json")
     if os.path.exists(json_path):
         print(f"{FM_FOLD}: dataset exists, skipping generation")
@@ -82,11 +108,18 @@ def generate():
 
 
 def load_fold(fold):
+    """Load the dataset JSON of one emax_* fold (dict with 'metadata' and 'runs')."""
     path = os.path.join(DATASETS_DIR, fold, f"f1_{F1}__f2_{F2}__nsteps_{STEPS}.json")
-    return json.load(open(path))
+    with open(path) as f:
+        return json.load(f)
 
 
 def adj_flip_rate(data):
+    """Percentage of declared adjacent pairs that reverse the true order.
+
+    Counts, over all replications and sessions of a dataset (as returned by load_fold), the
+    consecutive items of each declared order whose upper item has the lower true utility.
+    """
     flips = tot = 0
     for run in data['runs']:
         tu = np.array(run['true_utilities'])
@@ -99,7 +132,11 @@ def adj_flip_rate(data):
 
 
 def verify():
-    """The flip-matched fold must declare the same orders as e_max=5, Inc=50."""
+    """Check that the flip-matched fold declares the same orders as the e_max = 5, Finc = 50 fold.
+
+    Prints the check, the realized adjacent flip rates and both sigmas; raises AssertionError
+    if any declared order differs (the pairing would then be broken).
+    """
     fm = load_fold(FM_FOLD)
     e5 = load_fold(fold_name(INC, 5))
     same = all(a['items'] == b['items']
@@ -113,6 +150,12 @@ def verify():
 
 
 def run_arms():
+    """Run both arms on the flip-matched fold and recompute its metric files.
+
+    Same settings as run_emax_study.run_all with eta_max = 50 and
+    ``seed_base = RUN_SEED + 1000 * Finc + 300 + 10 * (arm index)``; the offset 300 keeps these
+    seeds apart from those of the e_max study folds (offsets 0 and 100).
+    """
     for arm_idx, sub_fold in enumerate(ARMS):
         alg_name, _ = parse_subfold_string(sub_fold)
         seed_base = RUN_SEED + INC * 1000 + 300 + arm_idx * 10
@@ -136,7 +179,15 @@ def run_arms():
 
 
 def collect():
-    """vals[variant][sub_fold][metric] = array (steps x tables)."""
+    """Gather the per-session metrics of the five variants and write ``CSV_PATH``.
+
+    Returns
+    -------
+    dict
+        ``vals[variant][arm][metric]``: array of shape (sessions, replications). The CSV has
+        one row per value, header ``Variant,Method,Metric,Step,Table,Value`` (Step counted
+        from 1, Table from 0).
+    """
     vals = {}
     rows = []
     for variant, (fold, _) in VARIANTS.items():
@@ -149,7 +200,6 @@ def collect():
                 for j in range(data.shape[0]):
                     for i in range(data.shape[1]):
                         rows.append((variant, sub_fold, metric, j + 1, i, data[j, i]))
-    import csv
     with open(CSV_PATH, 'w', newline='') as f:
         wr = csv.writer(f)
         wr.writerow(['Variant', 'Method', 'Metric', 'Step', 'Table', 'Value'])
@@ -159,12 +209,17 @@ def collect():
 
 
 def plot(vals):
+    """Plot the mean +- SE over replications of each metric per session for the five variants.
+
+    One panel per metric (rows) and method (columns); SE bands only for the paired Finc = 50
+    variants. ``vals`` as returned by collect(). Writes outputs/diagnostics/emax/emax_flipmatch.png.
+    """
     os.makedirs(OUT_DIR, exist_ok=True)
     metric_names = {'asrs': 'ASRS (RAI at true ranks)',
                     'asps': 'ASPS (pairwise success)',
                     'aios': 'AIOS (true best at rank 1)'}
-    # validated categorical slots 1-3 for the Inc=50 variants; muted ink for
-    # the no-inconsistency references (identity also carried by linestyle)
+    # The three Finc = 50 variants in distinct colours; the two noise-free references in
+    # muted grey, told apart by line style.
     series = [
         ('e50_flip', "#2a78d6", '-', 's', 2.2, '$e_{max}=50$, flip-matched (21% flips)'),
         ('e50_card', "#eb6834", '-', 'o', 2.2, '$e_{max}=50$, card-matched (3.5% flips)'),
@@ -217,6 +272,18 @@ def plot(vals):
 
 
 def summary(vals):
+    """Print the final-session means of every variant and the paired Wilcoxon tests.
+
+    The tests are two-sided Wilcoxon signed-rank tests over the paired replications of
+    e50_flip vs e5_inc50 (the paper's comparison) and e50_flip vs e50_card (NaN if SciPy
+    raises ValueError). ``vals`` as returned by collect().
+    """
+    def pval(a, b):
+        try:
+            return wilcoxon(a, b).pvalue
+        except ValueError:
+            return float('nan')
+
     print(f"\n===== FINAL-STEP (T={STEPS}) MEANS, {HM} tables =====")
     header = f"{'method':>10} {'metric':>6}" + "".join(f" {v:>10}" for v in VARIANTS)
     print(header)
@@ -234,17 +301,16 @@ def summary(vals):
             flip = vals['e50_flip'][sub_fold][metric][-1]
             e5 = vals['e5_inc50'][sub_fold][metric][-1]
             card = vals['e50_card'][sub_fold][metric][-1]
-
-            def pval(a, b):
-                try:
-                    return wilcoxon(a, b).pvalue
-                except ValueError:
-                    return float('nan')
-            print(f"{name:>10} {metric:>6} {flip.mean() - e5.mean():>+10.3f} {pval(flip, e5):>8.4f} "
+            print(f"{name:>10} {metric:>6} "
+                  f"{flip.mean() - e5.mean():>+10.3f} {pval(flip, e5):>8.4f} "
                   f"{flip.mean() - card.mean():>+13.3f} {pval(flip, card):>8.4f}")
 
 
 if __name__ == '__main__':
+    import argparse
+    argparse.ArgumentParser(description=__doc__.split('\n\n')[0].strip(),
+                            epilog='Takes no options: runs the whole (resumable) study; '
+                                   'run_emax_study.py must have run first.').parse_args()
     generate()
     verify()
     run_arms()

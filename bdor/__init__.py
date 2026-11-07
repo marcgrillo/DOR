@@ -6,10 +6,12 @@ with Sequential Preference Elicitation".
 Modules
 -------
 features     piecewise-linear marginal value features v(a) (paper Sec. 2.1)
-engine       PreferenceSampler: gap-observation likelihood, BAYES-DOR (NUTS) and FTRL-DOR (MAP)
-simulation   one replication of the multi-session elicitation loop
+engine       PreferenceSampler: gap-observation likelihood, BAYES-DOR (NUTS) and FTRL-DOR
+             (MAP) (Secs. 3.1-3.5)
+simulation   one replication of the multi-session elicitation loop (Sec. 4)
 runner       loops a method over dataset folders / replications and stores its states
-metrics      BenchmarkRunner: RAI, PWI and the ASR / ASP / AIO metrics (paper Sec. 5.2)
+metrics      BenchmarkRunner: RAI and PWI (eqs. (4)-(5)) and the ASR / ASP / AIO metrics
+             (Sec. 5.2)
 datagen      DatasetGenerator: synthetic decision makers and their elicitation data (Sec. 5.1)
 baselines    DOR and SMAA-DOR (smaa_original: as in the paper; smaa_adapted: per-gap variant)
 results      loading and pooling of the aggregated grid results

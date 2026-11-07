@@ -1,35 +1,30 @@
-"""
-e_max sensitivity experiment (2026-08-13).
+"""e_max study: card-scale cap e_max = 5 versus 50 on one fixed configuration.
 
-The grid campaign fixes the card-scale cap at e_max = 5 (ETA_MAX). Hypothesis:
-a finer scale carries more strength-of-preference information, so performance
-should improve. This script reruns ONE fixed grid configuration with
-e_max = 50 under the SAME generating mechanism (utilities scaled by e_max,
-cards = clip(round(noisy scaled diff), 0, e_max), sigma re-tuned to the SAME
-target consistency given e_max) and compares FTRL-DOR / BAYES-DOR
-(joint-v1 engine: theta_0 = 0 joint CLM, adjacent-only likelihood).
+Runs FTRL-DOR and BAYES-DOR (arms FTRL_DOR_EMXJ1 / BAYES_DOR_EMXJ1, eta_max = e_max; NUTS with
+200 warm-up + 200 draws) on |A| = 10, m = 3, k = 3, T = 10 for e_max in {5, 50} x Finc in
+{0, 35, 50}%, 10 replications per fold, paired across e_max; sigma is re-tuned per e_max so
+that P(exact card count) = 1 - Finc ('card-matched' noise, see generate_all). Resumable:
+existing datasets and per-session sample files are reused; the metric files are recomputed on
+every run (force=True). run_emax_flipmatch.py builds on these folds. No command-line options.
 
-Design: folds emax_F1=10_F2=3_S=10_AR=3_K=3_Inc={inc}_Emax={emax} for
-emax in {5, 50} x Inc in {0, 35}. For each Inc the global RNG is seeded
-identically before each emax's generation; n_max only rescales the (identical)
-draws, so both emax variants share identical tables, true utilities and noise
-z-scores -> perfectly PAIRED comparisons across emax. NOTE the mechanism's
-consistency definition: sigma is tuned so P(exact card) = 1 - Inc/100 GIVEN
-e_max, so at Inc > 0 the e_max = 50 DM is also less noisy on the utility
-scale (finer bins with the same per-bin hit rate) - that is part of the
-mechanism, and the Inc = 0 folds (sigma = 0 in both) isolate the pure
-quantization-granularity effect.
+Paper:   Sec. 5.4, consistent-DM numbers (the Finc = 0 rows, paired Wilcoxon at T = 10)
+Inputs:  none (generates data/datasets/emax_F1=10_F2=3_S=10_AR=3_K=3_Inc=<Finc>_Emax=<e_max>/)
+Outputs: results/emax_comparison.csv, outputs/diagnostics/emax/emax_evolution.png;
+         stdout: card statistics per fold and paired Wilcoxon tests at T = 10;
+         intermediate states and metrics under data/samples/ and data/metrics/
+Runtime: about 40 min from scratch, one process on a desktop CPU (BAYES-DOR at e_max = 50
+         takes about 10 min per fold); about a minute when all sample files exist.
 
-Arms: FTRL_DOR_EMXJ1 / BAYES_DOR_EMXJ1, 10 tables each, T=10 steps.
-Outputs: emax_comparison.csv, figs/emax/emax_evolution.png, console summary
-with final-step means and paired Wilcoxon (emax=50 vs 5 across tables).
+Usage:
+    python scripts/simulation/run_emax_study.py
 
-Run:  C:\\Users\\marco\\anaconda3\\python.exe compare_emax.py   (from DOR/)
+(formerly compare_emax.py)
 """
 import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))  # repo root, so `import bdor` works without installing
 import os
+import csv
 import json
 import time
 import numpy as np
@@ -45,27 +40,42 @@ from bdor.utils import parse_subfold_string
 import bdor.utils as utils
 from bdor.paths import DATASETS_DIR, RESULTS_DIR, DIAGNOSTICS_DIR
 
-F1, F2, STEPS, AR, K = 10, 3, 10, 3, 3
-EMAXES = [5, 50]
-INCS = [0, 35, 50]
-HM = 10
-GEN_SEED = 20260813  # + inc: same tables/true utilities/noise z-scores for both emax
-RUN_SEED = 40260813
+# Module-level constants: run_emax_flipmatch.py imports them.
+F1, F2, STEPS, AR, K = 10, 3, 10, 3, 3  # |A|, m, sessions T, subset size of session 1 / later
+EMAXES = [5, 50]                        # card-scale caps compared
+INCS = [0, 35, 50]                      # nominal inconsistency Finc (%)
+HM = 10                                 # replications per fold (= n_runs of each dataset)
+GEN_SEED = 20260813  # + Finc: both e_max folds of a Finc share tables, utilities, noise draws
+RUN_SEED = 40260813  # base of the inference seeds (formula in run_all)
 ARMS = ['FTRL_DOR_EMXJ1', 'BAYES_DOR_EMXJ1']
-METRICS = ['asrs', 'asps', 'aios']
+METRICS = ['asrs', 'asps', 'aios']      # ASR, ASP, AIO (paper eqs. (23)-(25))
 OUT_DIR = os.path.join(DIAGNOSTICS_DIR, 'emax')
 CSV_PATH = os.path.join(RESULTS_DIR, 'emax_comparison.csv')
 
-# chart chrome + validated categorical slots 1/2 (same hexes as compare_adjacent)
+# Plot colours: one per method, plus neutral tones for text, ticks, grid and background
+# (the neutral tones are reused by run_emax_flipmatch.py).
 BAYES_C, FTRL_C = "#2a78d6", "#eb6834"
 INK, INK2, MUTED, GRID, SURFACE = "#0b0b0b", "#52514e", "#898781", "#e1e0d9", "#fcfcfb"
 
 
 def fold_name(inc, emax):
+    """Dataset folder name of one fold, e.g. ``emax_F1=10_F2=3_S=10_AR=3_K=3_Inc=35_Emax=50``."""
     return f"emax_F1={F1}_F2={F2}_S={STEPS}_AR={AR}_K={K}_Inc={inc}_Emax={emax}"
 
 
 def generate_all():
+    """Generate the six datasets of the study, skipping those that already exist.
+
+    Before each e_max the global NumPy RNG is seeded with ``GEN_SEED + Finc``. The generator
+    (bdor.datagen) consumes the same random numbers whatever ``n_max`` is, so the two e_max
+    folds of one Finc share tables, true utilities, presented subsets and standard-normal
+    noise draws, replication by replication. sigma solves eq. (22) separately for each e_max
+    (gaps scaled by e_max), so that P(exact card count) = 1 - Finc on both card scales. At
+    Finc > 0 this makes the e_max = 50 DM about ten times less noisy on the utility scale,
+    with far fewer reversed orders (3.5% vs 21.0% of adjacent pairs at Finc = 50); the control
+    that holds the ordinal noise fixed is run_emax_flipmatch.py. At Finc = 0 (sigma = 0) both
+    folds declare the same orders and differ only in the card grid.
+    """
     for inc in INCS:
         for emax in EMAXES:
             fold = fold_name(inc, emax)
@@ -73,8 +83,7 @@ def generate_all():
             if os.path.exists(json_path):
                 print(f"{fold}: dataset exists, skipping generation")
                 continue
-            # Identical RNG stream for both emax within this Inc (n_max only
-            # rescales the draws), so emax variants are paired run-by-run.
+            # Same seed for both e_max values of this Finc: paired folds (see docstring).
             np.random.seed(GEN_SEED + inc)
             gen = DatasetGenerator(output_dir=os.path.join(DATASETS_DIR, fold), n_runs=HM)
             gen.generate_batch(
@@ -84,10 +93,25 @@ def generate_all():
 
 
 def card_stats(inc, emax):
-    """Sigma and card-count distribution: how much strength info the DM emits."""
+    """Noise scale and card-count distribution of one fold's dataset.
+
+    Parameters
+    ----------
+    inc, emax : int
+        Finc (%) and e_max of the fold.
+
+    Returns
+    -------
+    dict
+        ``sigma``: noise scale of eq. (21), on the e_max-scaled utility axis; ``mean``: mean
+        card count per gap; ``zero_share`` / ``cap_share``: share of gaps with 0 / e_max
+        cards; ``distinct``: number of distinct card counts. Pooled over all replications
+        and sessions.
+    """
     json_path = os.path.join(DATASETS_DIR, fold_name(inc, emax),
                              f"f1_{F1}__f2_{F2}__nsteps_{STEPS}.json")
-    data = json.load(open(json_path))
+    with open(json_path) as f:
+        data = json.load(f)
     cards = [c for run in data['runs'] for sr in run['subranks'] for c in sr['cards']]
     cards = np.array(cards)
     return {
@@ -100,6 +124,16 @@ def card_stats(inc, emax):
 
 
 def run_all():
+    """Run both arms on the six folds and recompute their metric files.
+
+    bdor.runner.run_batch_experiments runs the T = 10 sessions of every replication
+    (adjacent-gap observations, eta_max = e_max, prequential log-loss recorded) with
+    ``seed_base = RUN_SEED + 1000 * Finc + 100 * (e_max index) + 10 * (arm index)``, from which
+    bdor.simulation derives one seed per replication and session. FTRL-DOR is the MAP of
+    PreferenceSampler.find_map; BAYES-DOR runs NUTS with the 200 warm-up iterations and 200
+    draws set in bdor.simulation.get_sampler_state. Existing per-session states are reused;
+    PWI ('poi' in the code), RAI and ASR / ASP / AIO are then recomputed with force=True.
+    """
     for inc in INCS:
         for emax_idx, emax in enumerate(EMAXES):
             fold = fold_name(inc, emax)
@@ -126,6 +160,15 @@ def run_all():
 
 
 def collect():
+    """Gather the per-session metrics of every fold and arm and write ``CSV_PATH``.
+
+    Returns
+    -------
+    list of tuple
+        One row ``(Finc, e_max, arm, metric, session, replication, value)`` per metric value,
+        with session counted from 1 and replication from 0. The CSV holds the same rows under
+        the header ``Inc,Emax,Method,Metric,Step,Table,Value``.
+    """
     rows = []
     for inc in INCS:
         for emax in EMAXES:
@@ -136,7 +179,6 @@ def collect():
                     for j in range(data.shape[0]):
                         for i in range(data.shape[1]):
                             rows.append((inc, emax, sub_fold, metric, j + 1, i, data[j, i]))
-    import csv
     with open(CSV_PATH, 'w', newline='') as f:
         wr = csv.writer(f)
         wr.writerow(['Inc', 'Emax', 'Method', 'Metric', 'Step', 'Table', 'Value'])
@@ -146,6 +188,20 @@ def collect():
 
 
 def series_vals(arr, inc, emax, sub_fold, metric, step):
+    """Metric values of one fold, arm and session, ordered by replication.
+
+    Parameters
+    ----------
+    arr : ndarray of object, shape (n_rows, 7)
+        The rows returned by collect().
+    inc, emax, sub_fold, metric, step
+        Values to match in the first five columns.
+
+    Returns
+    -------
+    ndarray of float, shape (n_replications,)
+        Sorted by replication index, so the vectors for e_max = 5 and 50 are paired.
+    """
     m = ((arr[:, 0] == inc) & (arr[:, 1] == emax) & (arr[:, 2] == sub_fold)
          & (arr[:, 3] == metric) & (arr[:, 4] == step))
     # table index in col 5 orders the paired vectors identically on both sides
@@ -154,6 +210,11 @@ def series_vals(arr, inc, emax, sub_fold, metric, step):
 
 
 def plot(rows):
+    """Plot the mean +- SE over replications of each metric per session.
+
+    One panel per metric (rows) and Finc (columns), colour = method, line style = e_max;
+    ``rows`` as returned by collect(). Writes outputs/diagnostics/emax/emax_evolution.png.
+    """
     os.makedirs(OUT_DIR, exist_ok=True)
     arr = np.array(rows, dtype=object)
     metric_names = {'asrs': 'ASRS (RAI at true ranks)',
@@ -208,6 +269,12 @@ def plot(rows):
 
 
 def summary(rows):
+    """Print the card statistics of each fold and the final-session paired comparison.
+
+    For every Finc, arm and metric: the means at e_max = 5 and 50, their difference and the
+    two-sided Wilcoxon signed-rank p-value over the paired replications (NaN if SciPy raises
+    ValueError). ``rows`` as returned by collect().
+    """
     arr = np.array(rows, dtype=object)
     print("\n===== DGP per fold (sigma is on the e_max-scaled utility axis) =====")
     print(f"{'Inc':>4} {'emax':>5} {'sigma':>8} {'sigma/emax':>10} {'mean_cards':>10} "
@@ -237,6 +304,9 @@ def summary(rows):
 
 
 if __name__ == '__main__':
+    import argparse
+    argparse.ArgumentParser(description=__doc__.split('\n\n')[0].strip(),
+                            epilog='Takes no options: runs the whole (resumable) study.').parse_args()
     generate_all()
     run_all()
     rows = collect()

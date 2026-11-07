@@ -1,20 +1,37 @@
-"""Emit the main-text summary table (tab:overall_summary), replacing the old
-overall bar figure. Upper block: the four B-DOR arms over the whole grid.
-Lower block: proposed vs existing DOR methods after the first session (T=1).
-Each block is followed by one-sided paired Wilcoxon signed-rank tests, paired
-at the level of the simulated decision problem (identical data for all arms,
-replications shared by the two methods being compared).
+"""Write Table 3 of the paper (tab:overall_summary): overall means and Wilcoxon tests.
+
+Reads the aggregated grid results (192 AR == K configurations) and writes one LaTeX table
+of ASR, ASP and AIO, each cell the mean +- half-width of the normal 95% CI.
+Upper block: FTRL-DOR, FTRLdir, BAYES-DOR and BAYESdir over the whole grid (T in
+{1, 3, 5, 10}); each family is read on the replications it shares with its direction-only
+partner (20 per cell for the FTRL family, 5 for the BAYES family), followed by one-sided
+paired Wilcoxon signed-rank tests FTRL-DOR > FTRLdir and BAYES-DOR > BAYESdir.
+Lower block: FTRL-DOR, BAYES-DOR, SMAA-DOR and DOR after the first session only (T = 1),
+20 replications per cell, with the tests FTRL-DOR > DOR and BAYES-DOR > SMAA-DOR. Tests
+pair the two methods per replication (identical data), on the replications both have.
+
+Paper:   Table 3 (its numbers are quoted in Sec. 5.3, 'Overall comparison', and Sec. 5.5,
+         'Overall picture')
+Inputs:  results/grid_results_joint_v1.npz
+Outputs: outputs/tables/summary_table_v1.tex; test details on stdout
+Runtime: a few seconds
+
+Usage:
+    python scripts/paper/make_summary_table.py
+
+(formerly make_summary_table_v1.py)
 """
+import os
 import sys
 from pathlib import Path
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))  # repo root, so `import bdor` works without installing
-import os
 
 import numpy as np
 from scipy.stats import wilcoxon
 
-from bdor import results as m
 from bdor.paths import TABLES_DIR
+from bdor.results import PARTNER, T_LEVELS, load_results, mean_ci, parse_config, pool
 
 OUT = os.path.join(TABLES_DIR, "summary_table_v1.tex")
 
@@ -61,16 +78,36 @@ CAPTION = (
 
 
 def paired(results, arm_a, arm_b, metric, T=None):
-    """Per-table paired values under AR==K; tables index the same datasets."""
+    """Paired per-replication values of two arms over the AR == K configurations.
+
+    Replication i of a configuration is the same simulated decision problem for every
+    arm, so each cell contributes its first ``min(n_a, n_b)`` replications; pairs with a
+    NaN on either side are dropped.
+
+    Parameters
+    ----------
+    results : dict
+        Grid results (``bdor.results.load_results``).
+    arm_a, arm_b : str
+        Arm keys.
+    metric : {'asrs', 'asps', 'aios'}
+    T : int, optional
+        Use only the values after session ``T``; default: all of ``T_LEVELS``.
+
+    Returns
+    -------
+    x, y : ndarray, shape (n_pairs,)
+        Values of ``arm_a`` and ``arm_b``.
+    """
     xs, ys = [], []
     for c, arms in results.items():
-        p = m.parse_config(c)
+        p = parse_config(c)
         if p['AR'] != p['K'] or arm_a not in arms or arm_b not in arms:
             continue
         da = np.array(arms[arm_a][metric])
         db = np.array(arms[arm_b][metric])
         n = min(da.shape[1], db.shape[1])
-        for t in ([T] if T else m.T_LEVELS):
+        for t in ([T] if T else T_LEVELS):
             xs.extend(da[t - 1][:n])
             ys.extend(db[t - 1][:n])
     xs, ys = np.array(xs), np.array(ys)
@@ -79,6 +116,7 @@ def paired(results, arm_a, arm_b, metric, T=None):
 
 
 def pfmt(p):
+    """Format a p-value for the table (bounded at 0.001 and 0.999)."""
     if p < 0.001:
         return r"$<0.001$"
     if p > 0.999:
@@ -87,15 +125,19 @@ def pfmt(p):
 
 
 def mean_row(results, arm, T=None, match=None):
+    """LaTeX row of mean +- 95% CI of every metric for ``arm`` (optionally at horizon
+    ``T`` only, and cut to the replications shared with the arm ``match``)."""
     cells = []
     for met in METS:
         filt = {'T': T} if T else {}
-        mean, ci = m.mean_ci(m.pool(results, arm, met, match=match, **filt))
+        mean, ci = mean_ci(pool(results, arm, met, match=match, **filt))
         cells.append(f"${mean:.3f}{{\\scriptstyle\\pm{ci:.3f}}}$")
     return f"{LBL[arm]} & " + " & ".join(cells) + r" \\"
 
 
 def test_row(results, arm_a, arm_b, T=None):
+    """LaTeX row of one-sided paired Wilcoxon p-values (``arm_a`` > ``arm_b``) for every
+    metric; also prints n, the mean difference and the raw p-value."""
     cells = []
     for met in METS:
         x, y = paired(results, arm_a, arm_b, met, T=T)
@@ -113,7 +155,8 @@ def test_row(results, arm_a, arm_b, T=None):
 
 
 def main():
-    results = m.load_results()
+    """Build the table, write it to ``OUT`` and print the test details."""
+    results = load_results()
     lines = [
         r"\begin{table}[htp]",
         r"    \centering",
@@ -129,7 +172,7 @@ def main():
     for arm in UPPER_ARMS:
         # each family read on the replications it shares with its own
         # direction-only version, so the ablation stays a paired comparison
-        lines.append(mean_row(results, arm, match=m.PARTNER.get(arm)))
+        lines.append(mean_row(results, arm, match=PARTNER.get(arm)))
     print("Upper-block tests (whole grid):")
     for a, b in UPPER_TESTS:
         lines.append(test_row(results, a, b))

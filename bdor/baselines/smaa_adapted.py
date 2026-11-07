@@ -1,44 +1,84 @@
-"""
-SMAA-DOR baseline (Corrente, Greco, Zappala - arXiv:2405.04313, Sec. 3.2).
+"""Adapted per-gap DOR / SMAA-DOR: grid arms DORLP_DOR_ADJJ1 and SMAA_DOR_ADJJ1 (not reported).
 
-Samples value functions compatible with the DM's Deck-of-Cards preference
-information via Hit-And-Run over the polytope E^DM'':
+An earlier adaptation of DOR (Barbati et al. 2024) and SMAA-DOR (Corrente, Greco and
+Zappalà 2025, arXiv:2405.04313) to the sequential gap observations of B-DOR. The grid
+campaign (``scripts/simulation/run_grid.py``) still runs it, through
+``bdor.simulation.get_sampler_state``, as the arms ``DORLP_DOR_ADJJ1`` (``solve_dor_lp``)
+and ``SMAA_DOR_ADJJ1`` (``sample_smaa_dor``), but no paper output reads these arms: the
+baselines reported in the paper are the original formulation in ``smaa_original.py``.
+This module is still required because ``OriginalDORSampler`` subclasses
+``SMAADORSampler`` and reuses ``_solve_lp``, ``_interior_point`` and ``_hit_and_run``.
 
-    E^Model:   U(a) = w . x(a),  w >= 0,  sum(w) = 1        (additive PWL model)
-    ordering:  U(a) >= U(b)                    for each elicited pair a > b
-    cards:     U(a) - U(b) - s+ + s- = k * eta for each pair with eta blank cards
-    k >= eps,  s+ >= 0,  s- >= 0
-    sum(s+ + s-) <= sigma_bar + eta_budget     (paper's admitted deterioration)
+Formulation
+-----------
+The data are the m gap observations accumulated over all sessions so far
+(``PreferenceSampler.X_diff`` / ``.etas``, adjacent levels only in the grid arms): gap t
+has the feature difference d_t = (mean of v over the upper level) - (mean over the lower
+level) and eta_t blank cards. The variables are x = [w (p), k, s+ (m), s- (m)], with ONE
+deviation pair PER GAP:
 
-where sigma_bar is the minimal total deviation (LP problem (1) of the paper)
-and k is maximized as in LP problem (3) to fix eps and the k range.
+    E^Model    U(a) = v(a)^T w,  w >= 0,  sum(w) = 1
+    cards      d_t . w - s+_t + s-_t = k * eta_t          for every gap t
+    ordering   d_t . w >= 0                               for every gap t (hard mode)
+    bounds     0 <= k <= 1 (_K_CAP),  s+ >= 0,  s- >= 0
 
-Notes on the adaptation to this benchmark:
-- Preference information arrives as pairwise triples (a, b, eta) expanded from
-  subranks, so the proportionality constraint is written on differences
-  (the paper's interval-scale form, eqs. (4)-(5)) with nu(a) - nu(b) = eta.
-  The dataset generator produces cards as round(scaled utility difference),
-  hence eta (not eta + 1) is the difference in nu-units.
-- With inconsistent (cyclic) preference information the hard ordering
-  constraints U(a) >= U(b) can make the polytope empty; in that case they are
-  dropped and only the slack-based card constraints are kept (soft mode).
+Phase 1 minimises the total deviation sum(s+ + s-), giving sigma_bar; phase 2 maximises k
+subject to sum(s+ + s-) <= budget. The proportionality is written on differences (the
+interval-scale form, no offset) with target k * eta_t, the raw card count (capped at e_max
+by the simulation) rather than eta_t + 1: the dataset generator sets the cards to the
+rounded difference of the perceived utilities scaled by e_max, so eta_t is the gap in
+position units. With zero cards on every gap k would be unbounded, hence the cap
+``_K_CAP``.
+
+* ``solve_dor_lp`` (DOR): phase 2 at budget sigma_bar + 1e-9 (no deterioration admitted);
+  returns the weight part of the vertex.
+* ``SMAADORSampler.sample`` (SMAA-DOR): the budget is sigma_bar + j * step, j = 1, ..., 60,
+  step = max(0.01, 0.05 sigma_bar), increased until k* >= 1e-4 (``_K_MIN``) and the
+  polytope {E^Model, cards, ordering, sum(s+ + s-) <= budget,
+  max(1e-6, 0.01 k*) <= k <= min(1, k*)} has an interior point; Hit-and-Run started there
+  samples it uniformly.
+
+With inconsistent information (e.g. answers that contradict each other across sessions)
+the hard ordering rows can make the polytope empty or flat; they are then dropped and only
+the card equalities with their deviations are kept (soft mode).
 """
 
 import numpy as np
 from scipy.optimize import linprog
 from scipy.linalg import null_space
 
-_K_CAP = 1.0          # k upper bound when no pair carries cards (k unconstrained)
-_K_MIN = 1e-4         # minimal acceptable k* before growing the error budget
+_K_CAP = 1.0          # upper bound on k (k is unbounded when no gap carries cards)
+_K_MIN = 1e-4         # minimal acceptable k*; smaller values grow the error budget
 _INTERIOR_TOL = 1e-7  # minimal Chebyshev-like radius to accept a starting point
 
 
 def _solve_lp(c, A_ub, b_ub, A_eq, b_eq, bounds):
+    """``scipy.optimize.linprog`` with the HiGHS solver; returns its ``OptimizeResult``."""
     return linprog(c, A_ub=A_ub, b_ub=b_ub, A_eq=A_eq, b_eq=b_eq,
                    bounds=bounds, method="highs")
 
 
 class SMAADORSampler:
+    """Adapted per-gap SMAA-DOR over the accumulated gap observations (arm SMAA_DOR_ADJJ1).
+
+    Parameters
+    ----------
+    X_diff : array_like, shape (m, p)
+        Feature difference d_t of each gap observation (upper minus lower level centroid).
+    etas : array_like, shape (m,)
+        Blank cards eta_t of each gap.
+    n_params : int
+        Number p of weights (piecewise-linear increments).
+    seed : int
+        Seed of the generator used by ``sample`` (Dirichlet draws or Hit-and-Run).
+
+    Attributes
+    ----------
+    info : dict
+        Diagnostics of the last ``sample`` call: ``hard_ordering``, ``sigma_bar``,
+        ``degenerate`` and, unless degenerate, ``budget``, ``k_star`` and ``radius``.
+    """
+
     def __init__(self, X_diff, etas, n_params, seed=0):
         self.D = np.atleast_2d(np.asarray(X_diff, dtype=float))
         self.etas = np.asarray(etas, dtype=float).ravel()
@@ -52,6 +92,7 @@ class SMAADORSampler:
     # ------------------------------------------------------------------
 
     def _equalities(self):
+        """sum(w) = 1 and d_t . w - k eta_t - s+_t + s-_t = 0 for each gap (A x = b)."""
         p, m = self.p, self.m
         n = p + 1 + 2 * m
         A = np.zeros((1 + m, n))
@@ -129,7 +170,11 @@ class SMAADORSampler:
         return np.vstack(rows), np.concatenate(rhs)
 
     def _interior_point(self, G, h, A_eq, b_eq):
-        """max delta s.t. G x + delta * ||row|| <= h, A_eq x = b_eq."""
+        """Chebyshev-like centre: max delta s.t. G x + delta * ||row|| <= h, A_eq x = b_eq.
+
+        Returns ``(x, delta)`` with delta in [0, 10], or ``(None, 0.0)`` if the LP fails.
+        Row norms are taken in the full variable space (not projected on the equalities).
+        """
         n = G.shape[1]
         norms = np.linalg.norm(G, axis=1)
         norms[norms == 0] = 1.0
@@ -148,6 +193,30 @@ class SMAADORSampler:
     # ------------------------------------------------------------------
 
     def sample(self, num_samples=200, burn_in=None, thin=None):
+        """Adapted SMAA-DOR: Hit-and-Run draws, uniform over the compatible polytope.
+
+        Parameters
+        ----------
+        num_samples : int
+            Number of draws returned.
+        burn_in, thin : int or None
+            Hit-and-Run burn-in iterations and thinning interval; ``None`` uses
+            max(1000, 50 dim) and max(10, dim), with dim = p + m.
+
+        Returns
+        -------
+        ndarray, shape (num_samples, p + 1)
+            Rows [w, k]: weights (clipped at 0) and value k of a blank card. Without gap
+            observations: Dirichlet(1, ..., 1) weights and k = 0. When no budget gives
+            the polytope an interior point, in hard and then in soft mode:
+            ``num_samples`` copies of the last phase-2 vertex (``info['degenerate']`` is
+            True).
+
+        Raises
+        ------
+        RuntimeError
+            If the phase-1 LP fails even without the ordering rows.
+        """
         p = self.p
         if self.m == 0:
             # No information yet: uniform Dirichlet over the weight simplex.
@@ -163,8 +232,8 @@ class SMAADORSampler:
                 raise RuntimeError(f"SMAA-DOR phase-1 LP failed: {res1.message}")
         sigma_bar = max(res1.fun, 0.0)
 
-        # Grow the admitted deterioration until k* > 0 (paper Sec. 2) and the
-        # polytope has an interior to sample from.
+        # Grow the admitted deterioration until k* >= _K_MIN and the polytope has an
+        # interior point to start Hit-and-Run from.
         step = max(0.01, 0.05 * sigma_bar)
         x0 = None
         for trial in range(60):
@@ -183,8 +252,6 @@ class SMAADORSampler:
             if x0 is not None and radius > _INTERIOR_TOL:
                 break
             x0 = None
-        else:
-            pass
 
         if x0 is None and hard:
             # Cyclic information can make the hard-ordering polytope degenerate.
@@ -227,6 +294,20 @@ class SMAADORSampler:
         return np.hstack([w, k])
 
     def _hit_and_run(self, G, h, A_eq, x0, num_samples, burn_in, thin):
+        """Hit-and-Run over {x : G x <= h, A_eq x = A_eq x0}, started at the interior point x0.
+
+        Each iteration draws a uniformly random direction in the null space of ``A_eq``
+        (dimension dim) and moves to a uniform point of the feasible chord. After
+        ``burn_in`` iterations (default max(1000, 50 dim)) the current point is recorded
+        every ``thin`` iterations (default max(10, dim)); iterations with a degenerate
+        chord count but move and record nothing. After 10 * (burn_in + num_samples * thin)
+        iterations the remaining rows repeat the last point.
+
+        Returns
+        -------
+        ndarray, shape (num_samples, G.shape[1])
+            Draws of the full variable vector x.
+        """
         Z = null_space(A_eq)
         dim = Z.shape[1]
         if burn_in is None:
@@ -264,22 +345,34 @@ class SMAADORSampler:
 
 
 def sample_smaa_dor(X_diff, etas, n_params, num_samples=200, seed=0):
-    """Convenience wrapper used by the experiment pipeline."""
+    """Adapted SMAA-DOR draws (arm SMAA_DOR_ADJJ1), as called by ``get_sampler_state``.
+
+    ``SMAADORSampler(X_diff, etas, n_params, seed).sample(num_samples)``: an array of
+    shape (num_samples, p + 1) with rows [w, k].
+    """
     sampler = SMAADORSampler(X_diff, etas, n_params, seed=seed)
     return sampler.sample(num_samples=num_samples)
 
 
 def solve_dor_lp(X_diff, etas, n_params):
-    """
-    Original DOR linear programme (barbati2024deck) as a POINT-ESTIMATE
-    baseline: phase 1 minimises the total deviation sigma_bar; phase 2
-    maximises the discrimination k subject to that deviation budget and
-    returns the weight part of the optimal vertex (the "most discriminant"
-    compatible value function; sum(w) = 1 by the normalisation constraint).
+    """Adapted per-gap DOR point estimate (arm DORLP_DOR_ADJJ1).
 
-    Falls back from hard ordering constraints to soft (dropped) ordering when
-    infeasible, mirroring SMAADORSampler; returns uniform weights when there
-    are no observations or the LPs fail.
+    Phase 1 gives the minimal total deviation sigma_bar; phase 2 maximises the
+    discrimination k with total deviation at most sigma_bar + 1e-9 (no deterioration is
+    admitted, so k* may be 0), and the weight part of that vertex is returned. The hard
+    ordering rows are dropped when either LP fails with them, mirroring
+    ``SMAADORSampler``.
+
+    Parameters
+    ----------
+    X_diff, etas, n_params
+        As in ``SMAADORSampler``.
+
+    Returns
+    -------
+    ndarray, shape (p,)
+        Weights clipped at 0 and renormalised to sum 1; uniform when there are no gap
+        observations or the LPs fail.
     """
     p = int(n_params)
     uniform = np.full(p, 1.0 / p)

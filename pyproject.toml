@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=61"]
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -7,12 +7,13 @@ name = "bdor"
 version = "1.0.0"
 description = "Bayesian Deck-of-cards-based Ordinal Regression (B-DOR): BAYES-DOR and FTRL-DOR with sequential preference elicitation"
 readme = "README.md"
-license = { text = "MIT" }
+license = "MIT"
+license-files = ["LICENSE"]
 authors = [
     { name = "Marco Grillo" },
     { name = "Silvano Zappalà" },
 ]
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 dependencies = [
     "numpy",
     "scipy",

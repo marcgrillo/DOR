@@ -1,23 +1,39 @@
-"""Emit the appendix tables of the experimental section, two groups:
-  1. the four B-DOR arms (FTRL/BAYES, full and direction-only) over the whole
-     grid: one table per experimental factor;
-  2. the single-session comparison (T = 1) of the proposed estimators against
-     the one-shot existing DOR methods (SMAA-DOR, LP): one table per
-     remaining factor.
-The overall means live in the main text (tab:overall_summary, emitted by
-make_summary_table_v1.py); captions anchor their conventions there.
-Reuses the pooling of make_paper_figs_v1 so every entry matches the figures.
+"""Write Supplementary Tables B.1-B.9: metric means at each factor level, with Wilcoxon tests.
+
+Reads the aggregated grid results (192 AR == K configurations) and writes nine LaTeX
+tables; every cell is the mean +- half-width of the normal 95% CI of ASR, ASP or AIO at one
+level of one factor, averaged over all the other factors.
+Tables B.1-B.5 (labels tab:app_alt, _crit, _steps, _sub, _inc): FTRL-DOR, BAYES-DOR, FTRLdir
+and BAYESdir by |A|, m, T, k and Finc (T in {1, 3, 5, 10}); each family is read on the
+replications it shares with its direction-only partner (20 per cell for FTRL, 5 for BAYES),
+with per-level one-sided paired Wilcoxon tests FTRL-DOR > FTRLdir and BAYES-DOR > BAYESdir.
+Tables B.6-B.9 (labels tab:app_t1_alt, _crit, _sub, _inc): FTRL-DOR, BAYES-DOR, SMAA-DOR and
+DOR at T = 1 by |A|, m, k and Finc, 20 replications per cell, with per-level tests
+FTRL-DOR > DOR and BAYES-DOR > SMAA-DOR. The pooling (bdor.results.pool) is the one of
+make_figures.py, so every entry matches Figures 2 and 3.
+
+Paper:   Supplementary Tables B.1-B.9 (Appendix B), quoted in the factor paragraphs of
+         Sec. 5.3 and 5.5; the captions refer to Table 3 (make_summary_table.py)
+Inputs:  results/grid_results_joint_v1.npz
+Outputs: outputs/tables/appendix_tables_v1.tex; test details and the LaTeX on stdout
+Runtime: a few seconds
+
+Usage:
+    python scripts/paper/make_appendix_tables.py
+
+(formerly make_appendix_tables_v1.py)
 """
+import os
 import sys
 from pathlib import Path
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))  # repo root, so `import bdor` works without installing
-import os
 
 import numpy as np
 from scipy.stats import wilcoxon
 
-from bdor import results as m
 from bdor.paths import TABLES_DIR
+from bdor.results import PARTNER, T_LEVELS, load_results, mean_ci, parse_config, pool
 
 OUT = os.path.join(TABLES_DIR, "appendix_tables_v1.tex")
 
@@ -37,7 +53,8 @@ TESTS_BDOR = [
     ('BAYES_DOR_ADJJ1', 'BAYESDIR_DOR_ADJJ1', r"$p_{\mathrm{B>B_d}}$"),
 ]
 # T=1 tables: each proposed estimator against the existing method of the same
-# type -- point estimator vs the LP, sampling-based vs SMAA-DOR.
+# type -- the point estimator against DOR (the DOR linear programme), the
+# sampling-based one against SMAA-DOR.
 TESTS_BASE = [
     ('FTRL_DOR_ADJJ1', 'DORLP_DOR_ORIG', r"$p_{\mathrm{F>D}}$"),
     ('BAYES_DOR_ADJJ1', 'SMAA_DOR_ORIG', r"$p_{\mathrm{B>S}}$"),
@@ -75,7 +92,14 @@ FACTORS = [
      lambda lv: f"${lv}\\%$"),
 ]
 
+
 def cell(results, arm, met, fac=None, lv=None, t_fix=None, match=None):
+    """LaTeX cell 'mean +- 95% CI' of ``arm``/``met`` at level ``lv`` of factor ``fac``.
+
+    ``fac`` is a key of ``bdor.results.parse_config`` or 'T'; ``t_fix`` restricts the
+    pool to one horizon; ``match`` cuts every configuration to the replications shared
+    with that arm (see ``bdor.results.pool``).
+    """
     filt = {}
     if fac == 'T':
         filt['T'] = lv
@@ -83,17 +107,27 @@ def cell(results, arm, met, fac=None, lv=None, t_fix=None, match=None):
         filt[fac] = lv
     if t_fix is not None:
         filt['T'] = t_fix
-    v = m.pool(results, arm, met, match=match, **filt)
-    mean, ci = m.mean_ci(v)
+    v = pool(results, arm, met, match=match, **filt)
+    mean, ci = mean_ci(v)
     return f"${mean:.3f}{{\\scriptstyle\\pm{ci:.3f}}}$"
 
 
 def paired(results, arm_a, arm_b, metric, fac=None, lv=None, t_fix=None):
-    """Per-table paired values under AR==K, restricted to one factor level;
-    tables with the same index share the same simulated decision problem."""
+    """Paired per-replication values of two arms at one factor level (AR == K only).
+
+    Replication i of a configuration is the same simulated decision problem for every
+    arm, so each configuration contributes its first ``min(n_a, n_b)`` replications;
+    pairs with a NaN on either side are dropped. The horizons are ``t_fix`` if given,
+    else ``lv`` when ``fac == 'T'``, else all of ``T_LEVELS``.
+
+    Returns
+    -------
+    x, y : ndarray, shape (n_pairs,)
+        Values of ``arm_a`` and ``arm_b``.
+    """
     xs, ys = [], []
     for c, arms in results.items():
-        p = m.parse_config(c)
+        p = parse_config(c)
         if p['AR'] != p['K'] or arm_a not in arms or arm_b not in arms:
             continue
         if fac is not None and fac != 'T' and p[fac] != lv:
@@ -106,7 +140,7 @@ def paired(results, arm_a, arm_b, metric, fac=None, lv=None, t_fix=None):
         elif fac == 'T':
             ts = [lv]
         else:
-            ts = m.T_LEVELS
+            ts = T_LEVELS
         for t in ts:
             xs.extend(da[t - 1][:n])
             ys.extend(db[t - 1][:n])
@@ -116,6 +150,9 @@ def paired(results, arm_a, arm_b, metric, fac=None, lv=None, t_fix=None):
 
 
 def ptest(results, arm_a, arm_b, metric, fac, lv, t_fix=None):
+    """LaTeX cell with the p-value of the one-sided paired Wilcoxon signed-rank test
+    ``arm_a`` > ``arm_b`` at one factor level ('--' if all differences are zero); the
+    test details are printed."""
     x, y = paired(results, arm_a, arm_b, metric, fac=fac, lv=lv, t_fix=t_fix)
     d = x - y
     if np.all(d == 0):
@@ -134,6 +171,28 @@ def ptest(results, arm_a, arm_b, metric, fac, lv, t_fix=None):
 def factor_table(results, arms, header, label, ref, fac, levels, sym, desc,
                  fmt, t_fix=None, blocknote="", tests=(), note="",
                  match_map=None):
+    """LaTeX source of one appendix table: metric blocks by the levels of ``fac``.
+
+    Parameters
+    ----------
+    results : dict
+        Grid results (``bdor.results.load_results``).
+    arms : list of str
+        Arms, one column each; ``header`` holds their LaTeX column titles.
+    label, ref : str
+        LaTeX label of this table and of the table its caption refers to.
+    fac, levels, sym, desc, fmt
+        One entry of ``FACTORS``: filter key, levels, header symbol, caption text and
+        level formatter.
+    t_fix : int, optional
+        Restrict every cell to this horizon (the T = 1 tables).
+    blocknote, note : str
+        Caption fragments (block of Table 3 referred to; explanation of the tests).
+    tests : sequence of (arm_a, arm_b, column title)
+        One-sided paired Wilcoxon tests ``arm_a`` > ``arm_b``, one column each.
+    match_map : dict, optional
+        ``{arm: partner}`` for the replication matching of ``cell``.
+    """
     lead = ("Single-session comparison ($T=1$): mean of each metric at each "
             f"level of {desc}" if t_fix is not None
             else f"Mean of each metric at each level of {desc}")
@@ -168,7 +227,8 @@ def factor_table(results, arms, header, label, ref, fac, levels, sym, desc,
 
 
 def main():
-    results = m.load_results()
+    """Build Tables B.1-B.9, write them to ``OUT`` and print them with the test details."""
+    results = load_results()
     blocks = []
 
     # group 1: the four B-DOR algorithms over the whole grid
@@ -179,7 +239,7 @@ def main():
                                    fac, levels, sym, desc, fmt,
                                    blocknote=" (upper block)",
                                    tests=TESTS_BDOR, note=NOTE_BDOR,
-                                   match_map=m.PARTNER))
+                                   match_map=PARTNER))
 
     # group 2: single-session comparison against the existing DOR methods
     for suff, fac, levels, sym, desc, fmt in FACTORS:
