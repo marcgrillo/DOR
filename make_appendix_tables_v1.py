@@ -21,7 +21,7 @@ ARMS_BDOR = ['FTRL_DOR_ADJJ1', 'BAYES_DOR_ADJJ1',
              'FTRLDIR_DOR_ADJJ1', 'BAYESDIR_DOR_ADJJ1']
 HEADER_BDOR = r"FTRL&BAYES&FTRL$_{\text{dir}}$&BAYES$_{\text{dir}}$"
 ARMS_BASE = ['FTRL_DOR_ADJJ1', 'BAYES_DOR_ADJJ1',
-             'SMAA_DOR_ADJJ1', 'DORLP_DOR_ADJJ1']
+             'SMAA_DOR_ORIG', 'DORLP_DOR_ORIG']
 HEADER_BASE = r"FTRL&BAYES&SMAA&DOR"
 METS = [('asrs', 'ASR'), ('asps', 'ASP'), ('aios', 'AIO')]
 
@@ -35,8 +35,8 @@ TESTS_BDOR = [
 # T=1 tables: each proposed estimator against the existing method of the same
 # type -- point estimator vs the LP, sampling-based vs SMAA-DOR.
 TESTS_BASE = [
-    ('FTRL_DOR_ADJJ1', 'DORLP_DOR_ADJJ1', r"$p_{\mathrm{F>D}}$"),
-    ('BAYES_DOR_ADJJ1', 'SMAA_DOR_ADJJ1', r"$p_{\mathrm{B>S}}$"),
+    ('FTRL_DOR_ADJJ1', 'DORLP_DOR_ORIG', r"$p_{\mathrm{F>D}}$"),
+    ('BAYES_DOR_ADJJ1', 'SMAA_DOR_ORIG', r"$p_{\mathrm{B>S}}$"),
 ]
 
 NOTE_BDOR = (

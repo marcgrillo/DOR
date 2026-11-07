@@ -39,22 +39,22 @@ DPI = 200
 STYLE = {
     'FTRL_DOR_ADJJ1':  dict(color='#0072B2', ls='-',  marker='o', label='FTRL-DOR'),
     'BAYES_DOR_ADJJ1': dict(color='#E69F00', ls='--', marker='s', label='BAYES-DOR'),
-    'SMAA_DOR_ADJJ1':  dict(color='#009E73', ls='-.', marker='^', label='SMAA-DOR'),
-    'DORLP_DOR_ADJJ1': dict(color='#CC79A7', ls=':',  marker='D', label='DOR'),
+    'SMAA_DOR_ORIG':  dict(color='#009E73', ls='-.', marker='^', label='SMAA-DOR'),
+    'DORLP_DOR_ORIG': dict(color='#CC79A7', ls=':',  marker='D', label='DOR'),
     'FTRLDIR_DOR_ADJJ1':  dict(color='#7FC4EC', ls='-',  marker='o',
                                label=r'FTRL$_{\mathrm{dir}}$'),
     'BAYESDIR_DOR_ADJJ1': dict(color='#F3C673', ls='--', marker='s',
                                label=r'BAYES$_{\mathrm{dir}}$'),
 }
-ARMS_ALL = ['FTRL_DOR_ADJJ1', 'BAYES_DOR_ADJJ1', 'SMAA_DOR_ADJJ1',
-            'DORLP_DOR_ADJJ1', 'FTRLDIR_DOR_ADJJ1', 'BAYESDIR_DOR_ADJJ1']
+ARMS_ALL = ['FTRL_DOR_ADJJ1', 'BAYES_DOR_ADJJ1', 'SMAA_DOR_ORIG',
+            'DORLP_DOR_ORIG', 'FTRLDIR_DOR_ADJJ1', 'BAYESDIR_DOR_ADJJ1']
 DIR_ARMS = {'FTRLDIR_DOR_ADJJ1', 'BAYESDIR_DOR_ADJJ1'}
 # The paper's two comparisons: the four B-DOR arms over the full grid, and the
 # proposed estimators against the (one-shot) existing DOR methods at T = 1.
 ARMS_BDOR = ['FTRL_DOR_ADJJ1', 'BAYES_DOR_ADJJ1',
              'FTRLDIR_DOR_ADJJ1', 'BAYESDIR_DOR_ADJJ1']
 ARMS_BASELINES = ['FTRL_DOR_ADJJ1', 'BAYES_DOR_ADJJ1',
-                  'SMAA_DOR_ADJJ1', 'DORLP_DOR_ADJJ1']
+                  'SMAA_DOR_ORIG', 'DORLP_DOR_ORIG']
 # The direction-only ablation is a paired comparison, so the two bars of a
 # family must be read on the decision problems they share: since 2026-08-10
 # BAYES-DOR runs on all 20 problems per grid cell while BAYES_dir still runs on

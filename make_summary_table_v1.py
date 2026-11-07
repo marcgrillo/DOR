@@ -17,8 +17,8 @@ OUT = os.path.join("paper_tables", "summary_table_v1.tex")
 LBL = {
     'FTRL_DOR_ADJJ1': 'FTRL-DOR',
     'BAYES_DOR_ADJJ1': 'BAYES-DOR',
-    'SMAA_DOR_ADJJ1': 'SMAA-DOR',
-    'DORLP_DOR_ADJJ1': 'DOR',
+    'SMAA_DOR_ORIG': 'SMAA-DOR',
+    'DORLP_DOR_ORIG': 'DOR',
     'FTRLDIR_DOR_ADJJ1': r'FTRL$_{\text{dir}}$',
     'BAYESDIR_DOR_ADJJ1': r'BAYES$_{\text{dir}}$',
 }
@@ -29,11 +29,11 @@ UPPER_ARMS = ['FTRL_DOR_ADJJ1', 'FTRLDIR_DOR_ADJJ1',
 UPPER_TESTS = [('FTRL_DOR_ADJJ1', 'FTRLDIR_DOR_ADJJ1'),
                ('BAYES_DOR_ADJJ1', 'BAYESDIR_DOR_ADJJ1')]
 LOWER_ARMS = ['FTRL_DOR_ADJJ1', 'BAYES_DOR_ADJJ1',
-              'SMAA_DOR_ADJJ1', 'DORLP_DOR_ADJJ1']
+              'SMAA_DOR_ORIG', 'DORLP_DOR_ORIG']
 # like-for-like: the point estimator against DOR, the sampling-based
 # estimator against SMAA-DOR
-LOWER_TESTS = [('FTRL_DOR_ADJJ1', 'DORLP_DOR_ADJJ1'),
-               ('BAYES_DOR_ADJJ1', 'SMAA_DOR_ADJJ1')]
+LOWER_TESTS = [('FTRL_DOR_ADJJ1', 'DORLP_DOR_ORIG'),
+               ('BAYES_DOR_ADJJ1', 'SMAA_DOR_ORIG')]
 
 CAPTION = (
     r"Summary of the two comparisons. Upper block: mean of each metric over "

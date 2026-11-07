@@ -3,7 +3,17 @@ Case study for the B-DOR paper revision (Section 6): ranking the 21 Italian
 regions on healthcare performance (LEA criteria) under the ADJACENT-ONLY
 likelihood and the new inference engine.
 
-Migration-plan items E1-E6 (Decision 1: e_max = 30):
+Structure (2026-08-14 revision, Marco's restructure): BOTH illustration cases
+run the same three elicitation sessions (T = 3, cumulative) and differ only in
+the marginal utility functions -- case LIN uses gamma_j = 1 (linear), case PW
+uses gamma_j = 3 (piecewise linear).  Outputs per case: a corner plot of the
+RAW per-criterion totals U_j(100) after each session with the FTRL estimates
+overlaid (croner_steps_{lin,pw}.png), FTRL parameter and ranking tables with
+one row/column group per session, full RAI/PWI supplementary tables for the
+final posterior (table_S1-S4), and RAI/PWI EVOLUTION tables across sessions
+for the four top-ranked regions (table_{rai,pwi}_evolution_{lin,pw}.tex).
+
+Original migration-plan items E1-E6 (Decision 1: e_max = 30):
   E1  Data and elicitation sessions hard-coded from main_EJOR_1.tex
       (tab:LEA_data, fig:example_t1, fig:example_t3).
   E2  Responses are RAW card counts on consecutive gaps only: a subrank
@@ -105,6 +115,11 @@ LEA_TABLE = np.array([
 IDX = {name: i for i, name in enumerate(REGIONS)}
 NUM_REGIONS = len(REGIONS)
 CRITERIA = ["Prevention care ($g_1$)", "Primary care ($g_2$)", "Hospital care ($g_3$)"]
+# Row labels of the marginal-utility grid: the panels show the NORMALIZED
+# marginal utility hat{u}_j, so the criterion is named after its function.
+CRITERIA_HAT = [r"$\hat{u}_1(\cdot)$ (Prevention care)",
+                r"$\hat{u}_2(\cdot)$ (Primary care)",
+                r"$\hat{u}_3(\cdot)$ (Hospital care)"]
 
 # Short display names for the three-column T=3 ranking table (as in the paper).
 SHORT = {
@@ -123,12 +138,14 @@ STEP_2 = {"items": ["Emilia Romagna", "Friuli Venezia Giulia", "Campania", "Abru
 STEP_3 = {"items": ["Tuscany", "Lombardy", "Lazio", "Sicily"],
           "cards": [10, 21, 18]}
 
-SESSIONS_T1 = [STEP_1]
-SESSIONS_T3 = [STEP_1, STEP_2, STEP_3]
+# Both illustration cases run the SAME three sessions (T = 3, cumulative);
+# they differ only in the marginal utility functions: LIN uses gamma_j = 1
+# (linear), PW uses gamma_j = 3 (piecewise linear, equally spaced breakpoints).
+SESSIONS = [STEP_1, STEP_2, STEP_3]
 
 # Protocol cap (Decision 1): e_max = n_max = 30 for both cases (E3).
 E_MAX = 30
-_all_cards = [c for s in SESSIONS_T3 for c in s["cards"]]
+_all_cards = [c for s in SESSIONS for c in s["cards"]]
 assert max(_all_cards) <= E_MAX, \
     f"declared card count {max(_all_cards)} exceeds the protocol cap e_max={E_MAX}"
 
@@ -268,12 +285,27 @@ def plot_utilities(transformer, w_map, samples, out_path):
     """
     Three panels (one per criterion): BAYES posterior mean and 90% pointwise
     credible band (blue) + FTRL MAP estimate (red), x in [0, 100].
-    Utilities are on the raw parameter scale, as in the paper's FTRL tables.
+
+    Utilities are NORMALIZED PER DRAW by the total weight sum, i.e. the curves
+    show U_j(x) / U_max with U_max = U(ideal alternative scoring 100 on every
+    criterion) = sum of all piece weights.  The value at x = 100 is therefore
+    the criterion importance share hat{w}_j of the corner plots, and the three
+    panel endpoints sum to 1 in every draw.  Rationale: the raw scale of w is
+    shared with the thresholds Delta and is only weakly identified by a few
+    sessions, so raw-scale bands conflate irrelevant scale uncertainty with
+    the shape/share uncertainty that actually drives the rankings and the
+    RAI/PWI tables (the raw-scale band was ~[0, 4] around a mean of ~1.3).
     """
     m = transformer.num_criteria
+    n_params = transformer.total_params
     col_end = np.cumsum(transformer.n_w)
     col_start = np.insert(col_end[:-1], 0, 0)
     x_grid = np.linspace(0.0, 100.0, 201)
+
+    w_draws = samples[:, :n_params]
+    tot_draws = w_draws.sum(axis=1)                       # (n_draws,)
+    w_map = np.asarray(w_map)[:n_params]
+    tot_map = np.sum(w_map)
 
     plt.rcParams.update({"font.size": 13})
     fig, axes = plt.subplots(1, m, figsize=(4.6 * m, 4.2), sharey=True)
@@ -283,24 +315,190 @@ def plot_utilities(transformer, w_map, samples, out_path):
         F = criterion_features(bp, x_grid)
         s, e = int(col_start[j]), int(col_end[j])
 
-        curves = F @ samples[:, s:e].T           # (n_grid, n_draws)
+        curves = (F @ w_draws[:, s:e].T) / tot_draws[None, :]   # (n_grid, n_draws)
         y_lo = np.percentile(curves, 5, axis=1)
         y_hi = np.percentile(curves, 95, axis=1)
         ax.fill_between(x_grid, y_lo, y_hi, color=C_BAYES_FILL, alpha=0.25,
                         linewidth=0, label="BAYES 90% credible band")
         ax.plot(x_grid, curves.mean(axis=1), color=C_BAYES_LINE, lw=2,
                 label="BAYES posterior mean")
-        ax.plot(x_grid, F @ w_map[s:e], color=C_FTRL, lw=2, label="FTRL (MAP)")
+        ax.plot(x_grid, F @ w_map[s:e] / tot_map, color=C_FTRL, lw=2,
+                label="FTRL (MAP)")
 
         ax.set_title(CRITERIA[j])
         ax.set_xlabel("Criterion value")
         if j == 0:
-            ax.set_ylabel("Marginal utility")
+            ax.set_ylabel("Normalized marginal utility")
             ax.legend(fontsize=10, loc="upper left", framealpha=0.95)
         ax.set_xlim(0, 100)
         ax.set_ylim(bottom=0)
         ax.grid(True, alpha=0.3)
         ax.set_axisbelow(True)
+    plt.tight_layout()
+    plt.savefig(out_path, dpi=200)
+    plt.close()
+
+
+def criterion_totals(samples, n_params, group_sizes):
+    """Per-draw RAW per-criterion totals U_j(100) = sum of that criterion's
+    piece weights.  No normalization: this is the same scale as the FTRL
+    parameter tables (for gamma_j = 1, U_j(100) is the weight w_j itself)."""
+    w = np.atleast_2d(samples)[:, :n_params]
+    idx = np.cumsum([0] + list(group_sizes))
+    return np.stack([w[:, idx[j]:idx[j + 1]].sum(axis=1)
+                     for j in range(len(group_sizes))], axis=1)
+
+
+def plot_corner_steps(results, transformer, out_path, axis_labels):
+    """
+    Single corner plot of the per-criterion utilities U_j(100) (the sum of
+    that criterion's piece weights) NORMALIZED per draw by
+    U_max = sum_l U_l(100) = the utility of the ideal alternative scoring 100
+    on every criterion.  With this normalization U(ideal) = 1, the plotted
+    U_j(100) are the criterion importance shares and sum to 1 in every draw;
+    they are the ranking-relevant quantity.  One color per
+    session (matplotlib default cycle: blue T=1, orange T=2, green T=3),
+    with the FTRL MAP estimate of each session overlaid (dashed vertical
+    line on the diagonal panels, X marker on the bivariate panels).  2-D
+    panels show the 90% credible contour only; every panel has a grid.
+    """
+    n_params, sizes = transformer.total_params, transformer.n_w
+    totals = [criterion_totals(r["samples"], n_params, sizes) for r in results]
+    totals = [t / t.sum(axis=1, keepdims=True) for t in totals]
+    maps = [criterion_totals(r["w_map"], n_params, sizes)[0] for r in results]
+    maps = [m / m.sum() for m in maps]
+    # Matplotlib default color cycle (C0/C1/C2): with only three sessions,
+    # blue / orange / green are far easier to tell apart than colormap shades.
+    colors = ["#1f77b4", "#ff7f0e", "#2ca02c"][:len(totals)]
+    step_labels = [f"$T={r['step']}$" for r in results]
+    k = totals[0].shape[1]
+    rng = [(0.0, 1.0)] * k
+
+    def add_grid(ax):
+        ax.grid(True, alpha=0.3)
+        ax.set_axisbelow(True)
+
+    if HAVE_CORNER:
+        fig = None
+        for w, c in zip(totals, colors):
+            fig = corner_pkg.corner(
+                w, labels=axis_labels, range=rng,
+                color=c, fig=fig, plot_datapoints=False, plot_density=False,
+                no_fill_contours=True, levels=(0.9,), smooth=1.0,
+                hist_kwargs={"density": True, "lw": 2},
+                contour_kwargs={"linewidths": 1.8},
+                label_kwargs={"fontsize": 18})
+        axes = np.array(fig.axes).reshape(k, k)
+        for m, c in zip(maps, colors):
+            for i in range(k):
+                axes[i, i].axvline(m[i], color=c, ls="--", lw=1.6, zorder=5)
+                for j in range(i):
+                    axes[i, j].plot(m[j], m[i], marker="X", ms=10, color=c,
+                                    mec="white", mew=0.8, ls="none", zorder=6)
+        # Styling for half-page use: larger tick labels, axis labels pulled
+        # closer to the ticks, legend centered in the empty upper triangle.
+        for i in range(k):
+            for j in range(i + 1):
+                add_grid(axes[i, j])
+                axes[i, j].tick_params(axis="both", labelsize=14)
+        for j in range(k):
+            axes[k - 1, j].xaxis.set_label_coords(0.5, -0.25)
+        for i in range(1, k):
+            axes[i, 0].yaxis.set_label_coords(-0.25, 0.5)
+        handles = ([plt.Line2D([], [], color=c, lw=2) for c in colors]
+                   + [plt.Line2D([], [], color="#444444", marker="X", ms=9,
+                                 ls="none", mec="white", mew=0.8)])
+        fig.legend(handles, step_labels + ["FTRL estimate"],
+                   loc="center", bbox_to_anchor=(0.74, 0.8),
+                   frameon=True, fontsize=16)
+        fig.savefig(out_path, dpi=200)
+        plt.close(fig)
+        return
+    # Pure-matplotlib fallback: overlaid density hists / scatter, same overlays.
+    fig, axes = plt.subplots(k, k, figsize=(3.0 * k, 3.0 * k))
+    for i in range(k):
+        for j in range(k):
+            ax = axes[i, j]
+            if j > i:
+                ax.axis("off")
+                continue
+            for w, m, c, lab in zip(totals, maps, colors, step_labels):
+                if i == j:
+                    ax.hist(w[:, i], bins=40, density=True, histtype="step",
+                            color=c, lw=2, label=lab)
+                    ax.axvline(m[i], color=c, ls="--", lw=1.6)
+                else:
+                    ax.scatter(w[:, j], w[:, i], s=3, alpha=0.15, color=c)
+                    ax.plot(m[j], m[i], marker="X", ms=10, color=c,
+                            mec="white", mew=0.8, ls="none")
+            if i == j:
+                ax.set_yticks([])
+            ax.set_xlim(*rng[j])
+            add_grid(ax)
+            if i == k - 1:
+                ax.set_xlabel(axis_labels[j])
+            else:
+                ax.set_xticklabels([])
+            if j == 0 and i > 0:
+                ax.set_ylabel(axis_labels[i])
+    axes[0, 0].legend(fontsize=10, loc="upper right")
+    plt.tight_layout()
+    plt.savefig(out_path, dpi=200)
+    plt.close()
+
+
+def plot_marginals_steps(results, transformer, out_path):
+    """
+    Grid of NORMALIZED marginal utility functions: rows = criteria, columns =
+    sessions (T = 1..3).  Each panel shows the BAYES posterior mean with its
+    90% pointwise credible band (blue) and the FTRL MAP estimate (red) of
+    u_j(x)/U_max, with U_max = utility of the ideal alternative (per-draw
+    normalization, as in the corner plots; the value at x = 100 is the
+    criterion importance share).  Panels in a row SHARE the y-axis, so
+    reading a row left to right shows how that marginal utility evolves and
+    its band narrows as the sessions accumulate.
+    """
+    m = transformer.num_criteria
+    n_params = transformer.total_params
+    col_end = np.cumsum(transformer.n_w)
+    col_start = np.insert(col_end[:-1], 0, 0)
+    x_grid = np.linspace(0.0, 100.0, 201)
+
+    plt.rcParams.update({"font.size": 17})
+    fig, axes = plt.subplots(m, len(results),
+                             figsize=(4.3 * len(results), 3.2 * m),
+                             sharex=True, sharey="row")
+    for t, res in enumerate(results):
+        w = res["samples"][:, :n_params]
+        w = w / w.sum(axis=1, keepdims=True)
+        wm = np.asarray(res["w_map"])[:n_params]
+        wm = wm / wm.sum()
+        for j in range(m):
+            ax = axes[j, t]
+            bp = np.asarray(transformer.ch_p[j], dtype=float)
+            F = criterion_features(bp, x_grid)
+            s, e = int(col_start[j]), int(col_end[j])
+            curves = F @ w[:, s:e].T                     # (n_grid, n_draws)
+            ax.fill_between(x_grid, np.percentile(curves, 5, axis=1),
+                            np.percentile(curves, 95, axis=1),
+                            color=C_BAYES_FILL, alpha=0.25, linewidth=0,
+                            label="BAYES-DOR 90% band")
+            ax.plot(x_grid, curves.mean(axis=1), color=C_BAYES_LINE, lw=1.8,
+                    label="BAYES-DOR mean")
+            ax.plot(x_grid, F @ wm[s:e], color=C_FTRL, lw=1.8,
+                    label="FTRL-DOR")
+            ax.set_xlim(0, 100)
+            ax.grid(True, alpha=0.3)
+            ax.set_axisbelow(True)
+            ax.tick_params(axis="both", labelsize=16)
+            if j == 0:
+                ax.set_title(f"$T={res['step']}$", fontsize=21)
+            if t == 0:
+                ax.set_ylabel(CRITERIA_HAT[j], fontsize=17)
+                ax.set_ylim(bottom=0)
+            if j == m - 1:
+                ax.set_xlabel("Criterion value", fontsize=17)
+    axes[0, 0].legend(fontsize=14, loc="upper left", framealpha=0.95)
     plt.tight_layout()
     plt.savefig(out_path, dpi=200)
     plt.close()
@@ -436,57 +634,60 @@ def fmt_bp(x):
     return f"{x:.0f}" if abs(x - round(x)) < 1e-9 else f"{x:.1f}"
 
 
-def write_ftrl_tables(t1, t3, path):
+def write_ftrl_tables(lin, pw, path):
     """
-    T=1 table: U_j(0), U_j(100) (cf. paper tab:ftrl_ex_t1).
-    T=3 table: one row per step, U_j at every breakpoint (cf. tab:ftrl_ex_t3).
+    LIN table: one row per session, U_j(0) and U_j(100) (linear utilities).
+    PW table: one row per session, U_j at every breakpoint (gamma_j = 3).
+    Raw parameter scale in both (same scale as the corner plots).
     """
-    tr1, res1 = t1
-    tr3, res3 = t3
+    tr_lin, res_lin = lin
+    tr_pw, res_pw = pw
     lines = [
         "% FTRL-DOR parameter estimates for the LEA case study",
         "% (adjacent-only likelihood, e_max = n_max = 30).",
         "",
-        "% --- T = 1, one linear piece per criterion (gamma_j = 1) ---",
+        "% --- Linear utilities: gamma_j = 1, one row per session ---",
         "\\begin{table}[h!]",
         "\\centering",
-        "\\caption{Parameters estimated through FTRL-DOR in the case of a "
-        "single-session procedure ($T=1$) with one breakpoint per criterion}",
-        "\\label{tab:ftrl_ex_t1}",
-        "\\begin{tabular}{cc|cc|cc}",
+        "\\caption{Parameters estimated through FTRL-DOR after each of the "
+        "$T=3$ sessions in the case of linear marginal utility functions "
+        "(one breakpoint per criterion)}",
+        "\\label{tab:ftrl_lin}",
+        "\\begin{tabular}{l|cc|cc|cc}",
         "\\toprule",
-        "$U_1(0)$&$U_1(100)$&$U_2(0)$&$U_2(100)$&$U_3(0)$&$U_3(100)$\\\\",
+        "&$u_1(0)$&$u_1(100)$&$u_2(0)$&$u_2(100)$&$u_3(0)$&$u_3(100)$\\\\",
         "\\midrule",
     ]
-    u1 = utilities_at_breakpoints(tr1, res1[0]["w_map"])
-    lines.append("&".join(f"{u1[j][k]:.4f}".rstrip("0").rstrip(".") if u1[j][k] == 0
-                          else f"{u1[j][k]:.4f}"
-                          for j in range(3) for k in range(2)) + "\\\\")
+    for res in res_lin:
+        u = utilities_at_breakpoints(tr_lin, res["w_map"])
+        vals = "&".join("0" if u[j][k] == 0 else f"{u[j][k]:.4f}"
+                        for j in range(3) for k in range(2))
+        lines.append(f"$T={res['step']}$&" + vals + "\\\\")
     lines += ["\\bottomrule", "\\end{tabular}", "\\end{table}", ""]
 
-    bps = tr3.ch_p[0]
-    header = "&".join(f"$U_{{{j + 1}}}({fmt_bp(bp)})$"
+    bps = tr_pw.ch_p[0]
+    header = "&".join(f"$u_{{{j + 1}}}({fmt_bp(bp)})$"
                       for j in range(3) for bp in bps)
     cols = "X|" + "|".join("C" * len(bps) for _ in range(3))
     lines += [
-        "% --- T = 3, gamma_j = 3 equally spaced breakpoints per criterion ---",
+        "% --- Piecewise linear utilities: gamma_j = 3 equally spaced breakpoints ---",
         "\\begin{table}[H]",
         "\\centering",
         "\\footnotesize",
-        "\\caption{Parameters estimated through FTRL-DOR in the case of a "
-        "three-session procedure ($T=3$) with $\\gamma_j=3$ equally spaced "
-        "breakpoints per criterion}",
-        "\\label{tab:ftrl_ex_t3}",
+        "\\caption{Parameters estimated through FTRL-DOR after each of the "
+        "$T=3$ sessions in the case of piecewise linear marginal utility "
+        "functions with $\\gamma_j=3$ equally spaced breakpoints per criterion}",
+        "\\label{tab:ftrl_pw}",
         f"\\begin{{tabularx}}{{\\textwidth}}{{{cols}}}",
         "\\toprule",
         "&" + header + "\\\\",
         "\\midrule",
     ]
-    for res in res3:
-        u3 = utilities_at_breakpoints(tr3, res["w_map"])
-        vals = "&".join("0" if u3[j][k] == 0 else f"{u3[j][k]:.4f}"
+    for res in res_pw:
+        u = utilities_at_breakpoints(tr_pw, res["w_map"])
+        vals = "&".join("0" if u[j][k] == 0 else f"{u[j][k]:.4f}"
                         for j in range(3) for k in range(len(bps)))
-        lines.append(f"Step {res['step']}&" + vals + "\\\\")
+        lines.append(f"$T={res['step']}$&" + vals + "\\\\")
     lines += ["\\bottomrule", "\\end{tabularx}", "\\end{table}"]
     with open(path, "w") as f:
         f.write("\n".join(lines) + "\n")
@@ -498,76 +699,156 @@ def ranking_from_utilities(u_disp):
     return [(int(i), float(u_disp[i])) for i in order]
 
 
-def write_ranking_tables(t1, t3, path):
-    """
-    T=1: FTRL ranking (cf. paper tab:RANK_Ex1); T=3: FTRL ranking after each
-    step (cf. tab:RANK_Ex2).  Reference alternatives in bold (cumulative for
-    T=3).  Display scaling (plan E5): U_disp(a) = U(a)/U_max*100 with U_max the
-    utility of the ideal alternative scoring 100 on every criterion.
-    """
-    tr1, X1, res1 = t1
-    tr3, X3, res3 = t3
-
-    refs_t1 = {IDX[n] for n in STEP_1["items"]}
-    refs_t3_steps = []
-    acc = set()
-    for sess in SESSIONS_T3:
+def cumulative_reference_sets():
+    """Reference alternatives seen up to and including each session."""
+    refs, acc = [], set()
+    for sess in SESSIONS:
         acc |= {IDX[n] for n in sess["items"]}
-        refs_t3_steps.append(set(acc))
+        refs.append(set(acc))
+    return refs
 
+
+def ranking_table_lines(X, res_list, caption, label, top_n=None):
+    """Three-column-group FTRL ranking table, one group per session.
+    top_n limits the table to the first top_n positions of each session."""
+    refs_steps = cumulative_reference_sets()
+    rankings = [ranking_from_utilities(scaled_utilities(X, res["w_map"]))
+                for res in res_list]
+    lines = [
+        "\\begin{table}[h!]",
+        "\\centering",
+        f"\\caption{{{caption}}}",
+        f"\\label{{{label}}}",
+        "\\begin{tabularx}{\\textwidth}{c|Cc|Cc|Cc}",
+        "\\toprule",
+        "\\multirow{2}{*}{Rank}&\\multicolumn{2}{c}{$T=1$}&"
+        "\\multicolumn{2}{c}{$T=2$}&\\multicolumn{2}{c}{$T=3$}\\\\",
+        "\\cmidrule(lr){2-3}\\cmidrule(lr){4-5}\\cmidrule(lr){6-7}",
+        "&Region&$U\\left(a\\right)$&Region&$U\\left(a\\right)$&"
+        "Region&$U\\left(a\\right)$\\\\",
+        "\\midrule",
+    ]
+    for rank in range(top_n if top_n is not None else NUM_REGIONS):
+        cells = []
+        for s in range(len(res_list)):
+            idx, val = rankings[s][rank]
+            name = SHORT.get(REGIONS[idx], REGIONS[idx])
+            sval = f"{val:.2f}"
+            if idx in refs_steps[s]:
+                name, sval = f"\\textbf{{{name}}}", f"\\textbf{{{sval}}}"
+            cells += [name, sval]
+        lines.append(f"{rank + 1} & " + " & ".join(cells) + " \\\\")
+    lines += ["\\bottomrule", "\\end{tabularx}", "\\end{table}"]
+    return lines
+
+
+def write_ranking_tables(lin, pw, path):
+    """
+    FTRL ranking after each session for both cases (linear / piecewise).
+    Reference alternatives in bold (cumulative).  Display scaling (plan E5):
+    U_disp(a) = U(a)/U_max*100 with U_max the utility of the ideal alternative
+    scoring 100 on every criterion.
+    """
+    _, X_lin, res_lin = lin
+    _, X_pw, res_pw = pw
     lines = [
         "% FTRL-DOR rankings for the LEA case study (adjacent-only likelihood,",
         "% e_max = n_max = 30).  Display scaling (plan E5):",
         "% U_disp(a) = U(a) / U_max * 100, U_max = sum of all piece weights",
         "% (utility of the ideal alternative scoring 100 on every criterion).",
         "",
-        "\\begin{table}[h!]",
-        "\\centering",
-        "\\caption{Ranking of the alternatives considering the parameters "
-        "estimated through FTRL-DOR ($T=1$). The reference alternatives are "
-        "written in bold.}",
-        "\\label{tab:RANK_Ex1}",
-        "\\begin{tabular}{c|lc}",
-        "\\toprule",
-        "Rank&Region & $U\\left(a\\right)$ \\\\",
-        "\\midrule",
     ]
-    u1 = scaled_utilities(X1, res1[0]["w_map"])
-    for rank, (idx, val) in enumerate(ranking_from_utilities(u1), start=1):
-        name, sval = REGIONS[idx], f"{val:.4f}"
-        if idx in refs_t1:
-            name, sval = f"\\textbf{{{name}}}", f"\\textbf{{{sval}}}"
-        lines.append(f"{rank} & {name} & {sval} \\\\")
-    lines += ["\\bottomrule", "\\end{tabular}", "\\end{table}", ""]
+    lines += ranking_table_lines(
+        X_lin, res_lin,
+        "Ranking of the alternatives considering the parameters estimated "
+        "through FTRL-DOR after each of the $T=3$ sessions, in the case of "
+        "linear marginal utility functions. The utilities are expressed as "
+        "percentages of the utility of the ideal alternative, which scores "
+        "100 on every criterion. The reference alternatives are written in "
+        "bold.", "tab:RANK_lin")
+    lines.append("")
+    lines += ranking_table_lines(
+        X_pw, res_pw,
+        "Ranking of the alternatives considering the parameters estimated "
+        "through FTRL-DOR after each of the $T=3$ sessions, in the case of "
+        "piecewise linear marginal utility functions ($\\gamma_j=3$). The "
+        "utilities are expressed as percentages of the utility of the ideal "
+        "alternative, which scores 100 on every criterion. The reference "
+        "alternatives are written in bold.", "tab:RANK_pw")
+    with open(path, "w") as f:
+        f.write("\n".join(lines) + "\n")
 
-    rankings = [ranking_from_utilities(scaled_utilities(X3, res["w_map"]))
-                for res in res3]
-    lines += [
-        "\\begin{table}[h!]",
+
+def write_rai_evolution_table(rai_steps, top_idx, path, caption, label,
+                              max_rank=8):
+    """
+    RAI evolution for the top-ranked regions: one block of three rows
+    (T = 1, 2, 3) per region, columns = ranks 1..max_rank plus the aggregated
+    tail; shows how the rank distributions sharpen across sessions.
+    """
+    cols = "l l|" + "C" * max_rank + "C"
+    lines = [
+        f"\\begin{{table}}[h!]",
         "\\centering",
-        "\\caption{Ranking of the alternatives considering the parameters "
-        "estimated through FTRL-DOR after each of the $T=3$ sessions. The "
-        "reference alternatives are written in bold}",
-        "\\label{tab:RANK_Ex2}",
-        "\\begin{tabularx}{\\textwidth}{c|Cc|Cc|Cc}",
+        "\\footnotesize",
+        f"\\caption{{{caption}}}",
+        f"\\label{{{label}}}",
+        f"\\begin{{tabularx}}{{\\textwidth}}{{{cols}}}",
         "\\toprule",
-        "\\multirow{2}{*}{Rank}&\\multicolumn{2}{c}{Step 1}&"
-        "\\multicolumn{2}{c}{Step 2}&\\multicolumn{2}{c}{Step 3}\\\\",
-        "\\cmidrule(lr){2-3}\\cmidrule(lr){4-5}\\cmidrule(lr){6-7}",
-        "&Region&$U\\left(a\\right)$&Region&$U\\left(a\\right)$&"
-        "Region&$U\\left(a\\right)$\\\\",
+        f"\\multirow{{2}}{{*}}{{Region}}&\\multirow{{2}}{{*}}{{Sessions}}&"
+        f"\\multicolumn{{{max_rank + 1}}}{{c}}{{Rank}} \\\\",
+        f"\\cmidrule(lr){{3-{max_rank + 3}}}",
+        "&&" + "&".join(str(r) for r in range(1, max_rank + 1))
+        + f"&$>{max_rank}$\\\\",
         "\\midrule",
     ]
-    for rank in range(NUM_REGIONS):
+    for n, idx in enumerate(top_idx):
+        name = SHORT.get(REGIONS[idx], REGIONS[idx])
+        for t, rai in enumerate(rai_steps, start=1):
+            head = f"\\multirow{{3}}{{*}}{{{name} ($R_{{{idx + 1}}}$)}}" \
+                if t == 1 else ""
+            row = "&".join(fmt_pct(rai[idx, r]) for r in range(max_rank))
+            tail = fmt_pct(rai[idx, max_rank:].sum())
+            lines.append(f"{head}&$T={t}$&{row}&{tail}\\\\")
+        if n < len(top_idx) - 1:
+            lines.append("\\midrule")
+    lines += ["\\bottomrule", "\\end{tabularx}", "\\end{table}"]
+    with open(path, "w") as f:
+        f.write("\n".join(lines) + "\n")
+
+
+def write_pwi_evolution_table(pwi_steps, top_idx, path, caption, label):
+    """
+    PWI among the top-ranked regions after each session: rows = regions,
+    one column group per session with the PWI against each of the same
+    regions ('--' on the diagonal).
+    """
+    k = len(top_idx)
+    cols = "l|" + "|".join("C" * k for _ in pwi_steps)
+    ids = "&".join(f"$R_{{{b + 1}}}$" for b in top_idx)
+    lines = [
+        "% PWI[a,b] = fraction of posterior draws with U(a) >= U(b).",
+        "\\begin{table}[h!]",
+        "\\centering",
+        "\\footnotesize",
+        f"\\caption{{{caption}}}",
+        f"\\label{{{label}}}",
+        f"\\begin{{tabularx}}{{\\textwidth}}{{{cols}}}",
+        "\\toprule",
+        "&" + "&".join(f"\\multicolumn{{{k}}}{{c}}{{$T={t}$}}"
+                       for t in range(1, len(pwi_steps) + 1)) + "\\\\",
+        "".join(f"\\cmidrule(lr){{{2 + s * k}-{1 + (s + 1) * k}}}"
+                for s in range(len(pwi_steps))),
+        "Region&" + "&".join([ids] * len(pwi_steps)) + "\\\\",
+        "\\midrule",
+    ]
+    for a in top_idx:
+        name = SHORT.get(REGIONS[a], REGIONS[a])
         cells = []
-        for s in range(3):
-            idx, val = rankings[s][rank]
-            name = SHORT.get(REGIONS[idx], REGIONS[idx])
-            sval = f"{val:.2f}"
-            if idx in refs_t3_steps[s]:
-                name, sval = f"\\textbf{{{name}}}", f"\\textbf{{{sval}}}"
-            cells += [name, sval]
-        lines.append(f"{rank + 1} & " + " & ".join(cells) + " \\\\")
+        for pwi in pwi_steps:
+            for b in top_idx:
+                cells.append("--" if a == b else fmt_pct(pwi[a, b]))
+        lines.append(f"{name} ($R_{{{a + 1}}}$)&" + "&".join(cells) + "\\\\")
     lines += ["\\bottomrule", "\\end{tabularx}", "\\end{table}"]
     with open(path, "w") as f:
         f.write("\n".join(lines) + "\n")
@@ -584,54 +865,122 @@ def main():
     print("=" * 72)
 
     # --- inference -----------------------------------------------------------
-    print("\n--- Case T=1 (gamma_j = 1) ---")
-    tr1, X1, res1 = run_case("T1", SESSIONS_T1, gamma=1)
-    print("\n--- Case T=3 (gamma_j = 3, cumulative) ---")
-    tr3, X3, res3 = run_case("T3", SESSIONS_T3, gamma=3)
+    print("\n--- Case LIN (gamma_j = 1, T=3 cumulative) ---")
+    tr_lin, X_lin, res_lin = run_case("LIN", SESSIONS, gamma=1)
+    print("\n--- Case PW (gamma_j = 3, T=3 cumulative) ---")
+    tr_pw, X_pw, res_pw = run_case("PW", SESSIONS, gamma=3)
 
-    # --- figures -------------------------------------------------------------
-    plot_utilities(tr1, res1[0]["w_map"], res1[0]["samples"],
-                   os.path.join(OUT_DIR, "utilities_t1_plot.png"))
-    plot_corner(res1[0]["samples"], tr1.total_params,
-                os.path.join(OUT_DIR, "croner.png"))
-    plot_corner(res3[-1]["samples"], tr3.total_params,
-                os.path.join(OUT_DIR, "croner_t3.png"), group_sizes=tr3.n_w)
-    for res in res3:
-        plot_utilities(tr3, res["w_map"], res["samples"],
-                       os.path.join(OUT_DIR, f"t_3_{res['step']}.png"))
+    # --- corner figures (raw scale, FTRL overlays, one per case) -------------
+    # Paper notation (Section 2): lowercase u_j for the MARGINAL value
+    # functions; capital U(a) is reserved for the global utility.  The hat
+    # marks the per-draw normalization by the ideal alternative's utility.
+    labels_u = [r"$\hat{u}_1(100)$", r"$\hat{u}_2(100)$", r"$\hat{u}_3(100)$"]
+    plot_corner_steps(res_lin, tr_lin,
+                      os.path.join(OUT_DIR, "croner_steps_lin.png"), labels_u)
+    plot_corner_steps(res_pw, tr_pw,
+                      os.path.join(OUT_DIR, "croner_steps_pw.png"), labels_u)
+    plot_marginals_steps(res_pw, tr_pw,
+                         os.path.join(OUT_DIR, "marginals_steps_pw.png"))
 
-    # --- RAI / PWI supplementary tables -------------------------------------
-    rai_t1 = calc_rai(NUM_REGIONS, X1, res1[0]["samples"])
-    pwi_t1 = calc_pwi(NUM_REGIONS, X1, res1[0]["samples"])
-    rai_t3 = calc_rai(NUM_REGIONS, X3, res3[-1]["samples"])
-    pwi_t3 = calc_pwi(NUM_REGIONS, X3, res3[-1]["samples"])
+    # --- RAI / PWI after every session ---------------------------------------
+    rai_lin = [calc_rai(NUM_REGIONS, X_lin, r["samples"]) for r in res_lin]
+    pwi_lin = [calc_pwi(NUM_REGIONS, X_lin, r["samples"]) for r in res_lin]
+    rai_pw = [calc_rai(NUM_REGIONS, X_pw, r["samples"]) for r in res_pw]
+    pwi_pw = [calc_pwi(NUM_REGIONS, X_pw, r["samples"]) for r in res_pw]
 
-    write_rai_table(rai_t1, os.path.join(OUT_DIR, "table_S1_rai_t1.tex"),
-                    "Rank Acceptability Indices (\\%) of all regions computed "
-                    "from the posterior distribution estimated in the "
-                    "single-session case ($T=1$)", "tab:S1_rai_t1")
-    write_pwi_table(pwi_t1, os.path.join(OUT_DIR, "table_S2_pwi_t1.tex"),
-                    "Pairwise Winning Indices (\\%) of all regions computed "
-                    "from the posterior distribution estimated in the "
-                    "single-session case ($T=1$)", "tab:S2_pwi_t1")
-    write_rai_table(rai_t3, os.path.join(OUT_DIR, "table_S3_rai_t3.tex"),
-                    "Rank Acceptability Indices (\\%) of all regions computed "
-                    "from the final posterior distribution of the "
-                    "three-session case ($T=3$)", "tab:S3_rai_t3")
-    write_pwi_table(pwi_t3, os.path.join(OUT_DIR, "table_S4_pwi_t3.tex"),
-                    "Pairwise Winning Indices (\\%) of all regions computed "
-                    "from the final posterior distribution of the "
-                    "three-session case ($T=3$)", "tab:S4_pwi_t3")
+    # Supplementary tables: full 21-region RAI/PWI after the FIRST and after
+    # the THIRD session of each case -- the section compares T=1 with T=3, so
+    # both posteriors need to be documented (not only the final one).
+    for tag, desc, sec_ref, rai_steps, pwi_steps in [
+            ("lin", "linear marginal utility functions",
+             "sec:example_linear", rai_lin, pwi_lin),
+            ("pw", "piecewise linear marginal utility functions "
+             "($\\gamma_j=3$)", "sec:example_pw", rai_pw, pwi_pw)]:
+        for t in (1, 3):
+            when = ("the first session ($T=1$)" if t == 1
+                    else f"the $T={t}$ sessions")
+            write_rai_table(
+                rai_steps[t - 1],
+                os.path.join(OUT_DIR, f"table_rai_{tag}_t{t}.tex"),
+                "Rank Acceptability Indices (\\%) of all regions computed from "
+                f"the posterior distribution after {when}, with {desc} "
+                f"(Section \\ref{{{sec_ref}}})", f"tab:RAI_{tag}_t{t}")
+            write_pwi_table(
+                pwi_steps[t - 1],
+                os.path.join(OUT_DIR, f"table_pwi_{tag}_t{t}.tex"),
+                "Pairwise Winning Indices (\\%) of all regions computed from "
+                f"the posterior distribution after {when}, with {desc} "
+                f"(Section \\ref{{{sec_ref}}})", f"tab:PWI_{tag}_t{t}")
+
+    # --- RAI / PWI evolution across sessions for the top-4 regions -----------
+    rank_final_lin = ranking_from_utilities(
+        scaled_utilities(X_lin, res_lin[-1]["w_map"]))
+    top4_lin = [idx for idx, _ in rank_final_lin[:4]]
+    rank_final_pw = ranking_from_utilities(
+        scaled_utilities(X_pw, res_pw[-1]["w_map"]))
+    top4_pw = [idx for idx, _ in rank_final_pw[:4]]
+
+    write_rai_evolution_table(
+        rai_lin, top4_lin,
+        os.path.join(OUT_DIR, "table_rai_evolution_lin.tex"),
+        "Evolution across the $T=3$ sessions of the Rank Acceptability "
+        "Indices (\\%) of the four top-ranked regions, in the case of linear "
+        "marginal utility functions", "tab:rai_evo_lin")
+    write_pwi_evolution_table(
+        pwi_lin, top4_lin,
+        os.path.join(OUT_DIR, "table_pwi_evolution_lin.tex"),
+        "Evolution across the $T=3$ sessions of the Pairwise Winning Indices "
+        "(\\%) among the four top-ranked regions, in the case of linear "
+        "marginal utility functions", "tab:pwi_evo_lin")
+    write_rai_evolution_table(
+        rai_pw, top4_pw,
+        os.path.join(OUT_DIR, "table_rai_evolution_pw.tex"),
+        "Evolution across the $T=3$ sessions of the Rank Acceptability "
+        "Indices (\\%) of the four top-ranked regions, in the case of "
+        "piecewise linear marginal utility functions ($\\gamma_j=3$)",
+        "tab:rai_evo_pw")
+    write_pwi_evolution_table(
+        pwi_pw, top4_pw,
+        os.path.join(OUT_DIR, "table_pwi_evolution_pw.tex"),
+        "Evolution across the $T=3$ sessions of the Pairwise Winning Indices "
+        "(\\%) among the four top-ranked regions, in the case of piecewise "
+        "linear marginal utility functions ($\\gamma_j=3$)", "tab:pwi_evo_pw")
 
     # --- FTRL parameter and ranking tables -----------------------------------
-    write_ftrl_tables((tr1, res1), (tr3, res3),
+    write_ftrl_tables((tr_lin, res_lin), (tr_pw, res_pw),
                       os.path.join(OUT_DIR, "ftrl_tables.tex"))
-    write_ranking_tables((tr1, X1, res1), (tr3, X3, res3),
+    write_ranking_tables((tr_lin, X_lin, res_lin), (tr_pw, X_pw, res_pw),
                          os.path.join(OUT_DIR, "ranking_tables.tex"))
+    # Compact top-5 FTRL ranking for the linear subsection (the five regions
+    # its RAI/PWI discussion refers to), one column group per session.
+    top5 = ranking_table_lines(
+        X_lin, res_lin,
+        "The five highest-scoring regions after each of the $T=3$ sessions, "
+        "with the utilities computed from the FTRL-DOR parameter estimates "
+        "of the corresponding session, in the case of linear marginal "
+        "utility functions. The utilities are expressed as percentages of "
+        "the utility of the ideal alternative, which scores 100 on every "
+        "criterion. The reference alternatives are written in bold.",
+        "tab:rank_lin_top5", top_n=5)
+    with open(os.path.join(OUT_DIR, "table_rank_top5_lin.tex"), "w") as f:
+        f.write("\n".join(top5) + "\n")
+    top5_pw = ranking_table_lines(
+        X_pw, res_pw,
+        "The five highest-scoring regions after each of the $T=3$ sessions, "
+        "with the utilities computed from the FTRL-DOR parameter estimates "
+        "of the corresponding session, in the case of piecewise linear "
+        "marginal utility functions ($\\gamma_j=3$). The utilities are "
+        "expressed as percentages of the utility of the ideal alternative, "
+        "which scores 100 on every criterion. The reference alternatives "
+        "are written in bold.",
+        "tab:rank_pw_top5", top_n=5)
+    with open(os.path.join(OUT_DIR, "table_rank_top5_pw.tex"), "w") as f:
+        f.write("\n".join(top5_pw) + "\n")
 
     # --- long-format CSV dump -------------------------------------------------
     rows = []
-    for case_name, X, res_list in [("T1", X1, res1), ("T3", X3, res3)]:
+    for case_name, X, res_list in [("LIN", X_lin, res_lin),
+                                   ("PW", X_pw, res_pw)]:
         for res in res_list:
             u_ftrl = scaled_utilities(X, res["w_map"])
             u_bayes = bayes_mean_scaled_utilities(X, res["samples"])
@@ -645,28 +994,118 @@ def main():
 
     # --- console report -------------------------------------------------------
     print("\n" + "=" * 72)
-    print("T=1 FTRL ranking (display-scaled utilities):")
-    rank_t1 = ranking_from_utilities(scaled_utilities(X1, res1[0]["w_map"]))
-    for rank, (idx, val) in enumerate(rank_t1, start=1):
-        print(f"  {rank:2d}. {REGIONS[idx]:<32s} {val:7.2f}")
+    for case_name, X, res_list in [("LIN", X_lin, res_lin),
+                                   ("PW", X_pw, res_pw)]:
+        print(f"\n{case_name} FTRL rankings (display-scaled utilities), "
+              f"T=1 | T=2 | T=3:")
+        ranks = [ranking_from_utilities(scaled_utilities(X, res["w_map"]))
+                 for res in res_list]
+        for r in range(NUM_REGIONS):
+            cells = " | ".join(f"{REGIONS[ranks[s][r][0]]:<20.20s}{ranks[s][r][1]:7.2f}"
+                               for s in range(len(ranks)))
+            print(f"  {r + 1:2d}. {cells}")
 
-    # Sanity check (E1/E2): the reference-set order must be respected.
-    pos = {idx: r for r, (idx, _) in enumerate(rank_t1)}
+    # Sanity check (E1/E2): the session-1 reference order must be respected.
+    rank_s1 = ranking_from_utilities(scaled_utilities(X_lin, res_lin[0]["w_map"]))
+    pos = {idx: r for r, (idx, _) in enumerate(rank_s1)}
     ref_order = [IDX[n] for n in STEP_1["items"]]
     assert all(pos[ref_order[i]] < pos[ref_order[i + 1]] for i in range(3)), \
-        "FTRL T=1 ranking violates the reference order Lombardy > Marche > Campania > Basilicata"
-    print("  [check] reference order Lombardy > Marche > Campania > Basilicata respected")
+        "FTRL LIN T=1 ranking violates the reference order Lombardy > Marche > Campania > Basilicata"
+    print("\n  [check] reference order Lombardy > Marche > Campania > Basilicata respected")
 
-    top_rai = np.argsort(-rai_t1[:, 0])[:3]
-    print("\nT=1 BAYES top-3 by RAI rank-1:")
-    for idx in top_rai:
-        print(f"  {REGIONS[idx]:<32s} RAI(1) = {100 * rai_t1[idx, 0]:.1f}%")
+    print("\nRaw totals U_j(100): FTRL / BAYES median [5%, 95%]:")
+    for case_name, tr, res_list in [("LIN", tr_lin, res_lin),
+                                    ("PW", tr_pw, res_pw)]:
+        for res in res_list:
+            m = criterion_totals(res["w_map"], tr.total_params, tr.n_w)[0]
+            tot = criterion_totals(res["samples"], tr.total_params, tr.n_w)
+            qs = np.percentile(tot, [5, 50, 95], axis=0)
+            print(f"  {case_name} T={res['step']}: " + " | ".join(
+                f"U{j + 1}: {m[j]:.3f} / {qs[1][j]:.3f} [{qs[0][j]:.3f}, {qs[2][j]:.3f}]"
+                for j in range(len(m))))
+
+    print("\nNormalized U_j(100) (importance shares): FTRL / BAYES median [5%, 95%]:")
+    for case_name, tr, res_list in [("LIN", tr_lin, res_lin),
+                                    ("PW", tr_pw, res_pw)]:
+        for res in res_list:
+            m = criterion_totals(res["w_map"], tr.total_params, tr.n_w)[0]
+            m = m / m.sum()
+            tot = criterion_totals(res["samples"], tr.total_params, tr.n_w)
+            tot = tot / tot.sum(axis=1, keepdims=True)
+            qs = np.percentile(tot, [5, 50, 95], axis=0)
+            print(f"  {case_name} T={res['step']}: " + " | ".join(
+                f"U{j + 1}(100): {m[j]:.3f} / {qs[1][j]:.3f} "
+                f"[{qs[0][j]:.3f}, {qs[2][j]:.3f}]"
+                for j in range(len(m))))
+
+    # Normalized u_j at each interior breakpoint and at 100 (PW case), to
+    # quantify where along the scale the posterior is tight vs. wide.
+    print("\nPW normalized u_j at breakpoints (33.3/66.7/100): "
+          "FTRL / median [5%, 95%]:")
+    idx = np.cumsum([0] + list(tr_pw.n_w))
+    for res in res_pw:
+        w = res["samples"][:, :tr_pw.total_params]
+        w = w / w.sum(axis=1, keepdims=True)
+        wm = np.asarray(res["w_map"])[:tr_pw.total_params]
+        wm = wm / wm.sum()
+        for j in range(tr_pw.num_criteria):
+            cum = np.cumsum(w[:, idx[j]:idx[j + 1]], axis=1)
+            cm = np.cumsum(wm[idx[j]:idx[j + 1]])
+            q = np.percentile(cum, [5, 50, 95], axis=0)
+            cells = " ".join(
+                f"{cm[k]:.3f}/{q[1][k]:.3f}[{q[0][k]:.3f},{q[2][k]:.3f}]"
+                for k in range(cum.shape[1]))
+            print(f"  T={res['step']} u{j + 1}: {cells}")
+
+    # Utility of the IDEAL alternative (score 100 on every criterion):
+    # U_max = sum of all piece weights = sum_j U_j(100).  The figures and the
+    # ranking tables are expressed relative to it (=1 and =100 respectively).
+    print("\nIdeal alternative (100 on every criterion): raw U_max = sum_j U_j(100)")
+    print("  case  T   FTRL U_max   BAYES median [5%, 95%]   normalized   display")
+    for case_name, tr, X, res_list in [("LIN", tr_lin, X_lin, res_lin),
+                                       ("PW", tr_pw, X_pw, res_pw)]:
+        for res in res_list:
+            w = np.asarray(res["w_map"])[:tr.total_params]
+            u_max_ftrl = w.sum()
+            u_max_post = res["samples"][:, :tr.total_params].sum(axis=1)
+            q = np.percentile(u_max_post, [5, 50, 95])
+            # The ideal alternative saturates every feature, so its feature
+            # row is all ones: check against the display scaling used in the
+            # ranking tables (U(a)/U_max*100) and the figure normalization.
+            x_ideal = np.ones(tr.total_params)
+            disp = float(x_ideal @ w) / u_max_ftrl * 100.0
+            norm = float(x_ideal @ w) / u_max_ftrl
+            assert np.isclose(disp, 100.0) and np.isclose(norm, 1.0)
+            # No real region can exceed it.
+            assert scaled_utilities(X, res["w_map"]).max() <= 100.0 + 1e-9
+            print(f"  {case_name:<4s} {res['step']}   {u_max_ftrl:9.4f}   "
+                  f"{q[1]:7.3f} [{q[0]:6.3f}, {q[2]:7.3f}]   "
+                  f"{norm:10.1f}   {disp:7.1f}")
+    print("  (every real region scores below the ideal: max display utility "
+          f"{max(scaled_utilities(X_lin, res_lin[-1]['w_map']).max(), scaled_utilities(X_pw, res_pw[-1]['w_map']).max()):.2f})")
+
+    for case_name, rai_steps, pwi_steps, top4 in [
+            ("LIN", rai_lin, pwi_lin, top4_lin),
+            ("PW", rai_pw, pwi_pw, top4_pw)]:
+        print(f"\n{case_name} RAI evolution for the top-4 regions "
+              f"(RAI(1) / P(top 4)):")
+        for idx in top4:
+            row = " | ".join(f"T={t}: {100 * rai[idx, 0]:5.1f} / "
+                             f"{100 * rai[idx, :4].sum():5.1f}"
+                             for t, rai in enumerate(rai_steps, start=1))
+            print(f"  {REGIONS[idx]:<32.32s} {row}")
+        print(f"{case_name} PWI evolution among the top-4 (row beats column):")
+        for i, a in enumerate(top4):
+            for b in top4[i + 1:]:
+                row = " | ".join(f"T={t}: {100 * pwi[a, b]:5.1f}"
+                                 for t, pwi in enumerate(pwi_steps, start=1))
+                print(f"  {REGIONS[a][:14]:<14s} vs {REGIONS[b][:14]:<14s} {row}")
 
     print("\nHMC diagnostics:")
-    for case_name, res_list in [("T1", res1), ("T3", res3)]:
+    for case_name, res_list in [("LIN", res_lin), ("PW", res_pw)]:
         for res in res_list:
             d = res["diag"]
-            print(f"  {case_name} step {res['step']}: divergences={d['divergences']}, "
+            print(f"  {case_name} T={res['step']}: divergences={d['divergences']}, "
                   f"max split-Rhat={d['max_rhat']:.4f} ({res['t_hmc']:.1f}s)")
 
     print(f"\nOutputs written to {os.path.abspath(OUT_DIR)}")

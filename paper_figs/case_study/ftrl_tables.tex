@@ -1,33 +1,35 @@
 % FTRL-DOR parameter estimates for the LEA case study
 % (adjacent-only likelihood, e_max = n_max = 30).
 
-% --- T = 1, one linear piece per criterion (gamma_j = 1) ---
+% --- Linear utilities: gamma_j = 1, one row per session ---
 \begin{table}[h!]
 \centering
-\caption{Parameters estimated through FTRL-DOR in the case of a single-session procedure ($T=1$) with one breakpoint per criterion}
-\label{tab:ftrl_ex_t1}
-\begin{tabular}{cc|cc|cc}
+\caption{Parameters estimated through FTRL-DOR after each of the $T=3$ sessions in the case of linear marginal utility functions (one breakpoint per criterion)}
+\label{tab:ftrl_lin}
+\begin{tabular}{l|cc|cc|cc}
 \toprule
-$U_1(0)$&$U_1(100)$&$U_2(0)$&$U_2(100)$&$U_3(0)$&$U_3(100)$\\
+&$u_1(0)$&$u_1(100)$&$u_2(0)$&$u_2(100)$&$u_3(0)$&$u_3(100)$\\
 \midrule
-0&1.3728&0&1.2669&0&1.2027\\
+$T=1$&0&1.3728&0&1.2669&0&1.2027\\
+$T=2$&0&2.8645&0&2.1680&0&1.3890\\
+$T=3$&0&8.0401&0&3.8882&0&1.6430\\
 \bottomrule
 \end{tabular}
 \end{table}
 
-% --- T = 3, gamma_j = 3 equally spaced breakpoints per criterion ---
+% --- Piecewise linear utilities: gamma_j = 3 equally spaced breakpoints ---
 \begin{table}[H]
 \centering
 \footnotesize
-\caption{Parameters estimated through FTRL-DOR in the case of a three-session procedure ($T=3$) with $\gamma_j=3$ equally spaced breakpoints per criterion}
-\label{tab:ftrl_ex_t3}
+\caption{Parameters estimated through FTRL-DOR after each of the $T=3$ sessions in the case of piecewise linear marginal utility functions with $\gamma_j=3$ equally spaced breakpoints per criterion}
+\label{tab:ftrl_pw}
 \begin{tabularx}{\textwidth}{X|CCCC|CCCC|CCCC}
 \toprule
-&$U_{1}(0)$&$U_{1}(33.3)$&$U_{1}(66.7)$&$U_{1}(100)$&$U_{2}(0)$&$U_{2}(33.3)$&$U_{2}(66.7)$&$U_{2}(100)$&$U_{3}(0)$&$U_{3}(33.3)$&$U_{3}(66.7)$&$U_{3}(100)$\\
+&$u_{1}(0)$&$u_{1}(33.3)$&$u_{1}(66.7)$&$u_{1}(100)$&$u_{2}(0)$&$u_{2}(33.3)$&$u_{2}(66.7)$&$u_{2}(100)$&$u_{3}(0)$&$u_{3}(33.3)$&$u_{3}(66.7)$&$u_{3}(100)$\\
 \midrule
-Step 1&0&0.9998&2.0341&5.8498&0&0.9998&2.4977&3.8676&0&0.9998&1.9996&4.0289\\
-Step 2&0&0.9991&2.5111&9.4637&0&0.9991&3.7098&7.3751&0&0.9991&1.9981&5.0313\\
-Step 3&0&0.9991&3.3022&10.6975&0&0.9991&5.3652&8.2902&0&0.9991&1.9982&5.9030\\
+$T=1$&0&0.9998&2.0341&5.8498&0&0.9998&2.4977&3.8676&0&0.9998&1.9996&4.0289\\
+$T=2$&0&0.9991&2.5111&9.4637&0&0.9991&3.7098&7.3751&0&0.9991&1.9981&5.0313\\
+$T=3$&0&0.9991&3.3022&10.6975&0&0.9991&5.3652&8.2902&0&0.9991&1.9982&5.9030\\
 \bottomrule
 \end{tabularx}
 \end{table}
