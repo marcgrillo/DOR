@@ -633,7 +633,7 @@ def write_rai_table(rai, path, caption, label):
         row = " & ".join(fmt_pct(rai[a, r]) for r in range(NUM_REGIONS))
         lines.append(f"$R_{{{a + 1}}}$ & {row} \\\\")
     lines += ["\\bottomrule", "\\end{tabularx}", "\\end{table}"]
-    with open(path, "w") as f:
+    with open(path, "w", newline="\n") as f:
         f.write("\n".join(lines) + "\n")
 
 
@@ -662,7 +662,7 @@ def write_pwi_table(pwi, path, caption, label):
         row = " & ".join(fmt_pct(pwi[a, b]) for b in range(NUM_REGIONS))
         lines.append(f"$R_{{{a + 1}}}$ & {row} \\\\")
     lines += ["\\bottomrule", "\\end{tabularx}", "\\end{table}"]
-    with open(path, "w") as f:
+    with open(path, "w", newline="\n") as f:
         f.write("\n".join(lines) + "\n")
 
 
@@ -751,7 +751,7 @@ def write_ftrl_tables(lin, pw, path):
                         for j in range(3) for k in range(len(bps)))
         lines.append(f"$T={res['step']}$&" + vals + "\\\\")
     lines += ["\\bottomrule", "\\end{tabularx}", "\\end{table}"]
-    with open(path, "w") as f:
+    with open(path, "w", newline="\n") as f:
         f.write("\n".join(lines) + "\n")
 
 
@@ -868,7 +868,7 @@ def write_ranking_tables(lin, pw, path):
         "utilities are expressed as percentages of the utility of the ideal "
         "alternative, which scores 100 on every criterion. The reference "
         "alternatives are written in bold.", "tab:RANK_pw")
-    with open(path, "w") as f:
+    with open(path, "w", newline="\n") as f:
         f.write("\n".join(lines) + "\n")
 
 
@@ -919,7 +919,7 @@ def write_rai_evolution_table(rai_steps, top_idx, path, caption, label,
         if n < len(top_idx) - 1:
             lines.append("\\midrule")
     lines += ["\\bottomrule", "\\end{tabularx}", "\\end{table}"]
-    with open(path, "w") as f:
+    with open(path, "w", newline="\n") as f:
         f.write("\n".join(lines) + "\n")
 
 
@@ -958,7 +958,7 @@ def write_pwi_evolution_table(pwi_steps, top_idx, path, caption, label):
                 cells.append("--" if a == b else fmt_pct(pwi[a, b]))
         lines.append(f"{name} ($R_{{{a + 1}}}$)&" + "&".join(cells) + "\\\\")
     lines += ["\\bottomrule", "\\end{tabularx}", "\\end{table}"]
-    with open(path, "w") as f:
+    with open(path, "w", newline="\n") as f:
         f.write("\n".join(lines) + "\n")
 
 
@@ -1072,7 +1072,7 @@ def main():
         "the utility of the ideal alternative, which scores 100 on every "
         "criterion. The reference alternatives are written in bold.",
         "tab:rank_lin_top5", top_n=5)
-    with open(os.path.join(OUT_DIR, "table_rank_top5_lin.tex"), "w") as f:
+    with open(os.path.join(OUT_DIR, "table_rank_top5_lin.tex"), "w", newline="\n") as f:
         f.write("\n".join(top5) + "\n")
     top5_pw = ranking_table_lines(
         X_pw, res_pw,
@@ -1084,7 +1084,7 @@ def main():
         "which scores 100 on every criterion. The reference alternatives "
         "are written in bold.",
         "tab:rank_pw_top5", top_n=5)
-    with open(os.path.join(OUT_DIR, "table_rank_top5_pw.tex"), "w") as f:
+    with open(os.path.join(OUT_DIR, "table_rank_top5_pw.tex"), "w", newline="\n") as f:
         f.write("\n".join(top5_pw) + "\n")
 
     # --- case_study_summary.csv: FTRL-DOR and posterior-mean rankings -------
@@ -1100,7 +1100,7 @@ def main():
                                  "method": method, "region": REGIONS[idx],
                                  "rank": rank, "utility": round(val, 4)})
     pd.DataFrame(rows).to_csv(os.path.join(OUT_DIR, "case_study_summary.csv"),
-                              index=False)
+                              index=False, lineterminator="\n")
 
     # --- console report (source of the numbers quoted in Secs. 6.1-6.2) ------
     print("\n" + "=" * 72)

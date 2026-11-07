@@ -1,6 +1,6 @@
-# Line endings: LF in the repository and in fresh checkouts. On Windows the scripts write
-# their text outputs with CRLF; git normalises line endings when comparing, so check
-# regenerated outputs with `git diff` (not with a byte comparison of the files).
+# Line endings: LF in the repository and in every checkout. The scripts write their text
+# outputs with LF on every platform, so regenerated outputs compare byte for byte with the
+# committed ones and `git status` stays clean when nothing changed.
 * text=auto eol=lf
 *.png binary
 *.pdf binary

@@ -415,7 +415,7 @@ class DatasetGenerator:
                 # Save config JSON
                 base_name = f"f1_{f1}__f2_{f2}__nsteps_{num_steps}"
                 json_path = os.path.join(self.output_dir, f"{base_name}.json")
-                with open(json_path, 'w') as f:
+                with open(json_path, 'w', newline='\n') as f:
                     json.dump(dataset_json, f, indent=2)
                 print(f"Dataset saved to {json_path}")
 

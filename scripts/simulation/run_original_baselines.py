@@ -208,7 +208,7 @@ def main():
 
     header = "fold,f1,f2,ar,k,inc,table,method,asr,asp,aio"
     tmp = CSV_PATH + ".tmp"  # write next to the target, then replace it in one step
-    with open(tmp, "w") as fh:
+    with open(tmp, "w", newline="\n") as fh:
         fh.write(header + "\n")
         for r in all_rows:
             fh.write(",".join(map(str, r)) + "\n")

@@ -190,7 +190,7 @@ def main():
 
     tex = "\n".join(lines) + "\n"
     os.makedirs(os.path.dirname(OUT), exist_ok=True)
-    with open(OUT, "w", encoding="utf-8") as f:
+    with open(OUT, "w", encoding="utf-8", newline="\n") as f:
         f.write(tex)
     print(f"\nwrote {OUT}")
 

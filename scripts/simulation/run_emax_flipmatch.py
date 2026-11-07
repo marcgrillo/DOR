@@ -201,7 +201,7 @@ def collect():
                     for i in range(data.shape[1]):
                         rows.append((variant, sub_fold, metric, j + 1, i, data[j, i]))
     with open(CSV_PATH, 'w', newline='') as f:
-        wr = csv.writer(f)
+        wr = csv.writer(f, lineterminator='\n')
         wr.writerow(['Variant', 'Method', 'Metric', 'Step', 'Table', 'Value'])
         wr.writerows(rows)
     print(f"Wrote {CSV_PATH} ({len(rows)} rows)")

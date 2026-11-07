@@ -177,7 +177,7 @@ def collect():
                             rows.append((inc, tau, sub_fold, metric, j + 1, i,
                                          data[j, i], s_mean, multi_share))
     with open(CSV_PATH, 'w', newline='') as f:
-        wr = csv.writer(f)
+        wr = csv.writer(f, lineterminator='\n')
         wr.writerow(['Inc', 'Tau', 'Method', 'Metric', 'Step', 'Table', 'Value',
                      'MeanLevelsPerSubrank', 'MultiLevelShare'])
         wr.writerows(rows)
